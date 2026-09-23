@@ -1,0 +1,30 @@
+[project]
+name = "wuixpose"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "levi", email = "siromivel@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.2,<5.3",
+    "django-redis>=7.0.0",
+    "djangorestframework>=3.18.1",
+    "psycopg[binary]>=3.2",
+]
+
+[project.scripts]
+wuixpose = "wuixpose:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+    "ruff>=0.16.8",
+]

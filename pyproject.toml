@@ -28,3 +28,10 @@ dev = [
     "pytest-django>=4.14.0",
     "ruff>=0.16.8",
 ]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "wuixpose.config.settings"
+python_files = ["tests.py", "test_*.py"]
+
+[tool.ruff]
+extend-exclude = ["**/migrations/*"]

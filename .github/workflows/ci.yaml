@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel an in-progress run when a newer commit lands on the same branch or PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      # Same image as compose.yaml, so CI and local dev run the same Postgres and PostGIS.
+      db:
+        image: imresamu/postgis:17-3.5-alpine
+        env:
+          POSTGRES_DB: wuixpose
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d wuixpose"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GeoDjango loads the GDAL and GEOS C libraries even just to import, and the
+      # runner image doesn't include them.
+      - name: Install GDAL and GEOS
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends gdal-bin
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      # Installs the Python version from .python-version and fails if uv.lock is out of date.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Check for missing migrations
+        working-directory: src/wuixpose
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      # pytest exits with code 5 when it collects no tests. Accept that until the first
+      # test exists, then delete the `|| ...` part so an empty run fails.
+      - name: Test
+        run: uv run pytest
+  

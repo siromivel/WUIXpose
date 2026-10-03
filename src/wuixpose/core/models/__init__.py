@@ -1,4 +1,4 @@
-from .tracts import Tract
 from .structures import Structure
+from .tracts import Tract
 
-__all__ = ["Tract", "Structure"]
+__all__ = ["Structure", "Tract"]

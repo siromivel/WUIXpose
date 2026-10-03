@@ -1,6 +1,6 @@
 # WUIXpose
 
-[![CI](https://github.com/siromivel/wuixpose/actions/workflows/ci.yml/badge.svg)](https://github.com/siromivel/wuixpose/actions/workflows/ci.yml)
+[![CI](https://github.com/siromivel/wuixpose/actions/workflows/ci.yaml/badge.svg)](https://github.com/siromivel/wuixpose/actions/workflows/ci.yaml)
 
 Wildfire mitigation insight for homes in the wildland-urban interface (WUI), built from public
 satellite imagery (Sentinel-2).

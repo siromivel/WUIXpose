@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'rest_framework',
-    'wuixpose.status.apps.StatusConfig',
+    'wuixpose.core.apps.CoreConfig',
 ]
 
 MIDDLEWARE = [
@@ -71,7 +71,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'wuixpose.config.wsgi.application'
-ASGI_APPLICATION = 'wuixpose.config.wsgi.application'
+ASGI_APPLICATION = 'wuixpose.config.asgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases

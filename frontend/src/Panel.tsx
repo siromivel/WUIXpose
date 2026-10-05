@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 
 import { type StructureDetail, type Summary, type TractDetail, fetchStructure, fetchTract } from './api'
-import { type LayerVisibility, MIN_ZOOM, type Selection } from './layers'
+import { type LayerVisibility, type Selection, type TileSources } from './layers'
 
 interface Props {
   summary: Summary | null
-  summaryError: string | null
+  tileSources: TileSources | null
+  loadError: string | null
   zoom: number
   visible: LayerVisibility
   onToggle: (layer: keyof LayerVisibility) => void
@@ -21,7 +22,7 @@ const LAYER_LABELS: Record<keyof LayerVisibility, string> = {
 
 const number = new Intl.NumberFormat('en-US')
 
-export function Panel({ summary, summaryError, zoom, visible, onToggle, selection, onSelect }: Props) {
+export function Panel({ summary, tileSources, loadError, zoom, visible, onToggle, selection, onSelect }: Props) {
   return (
     <aside className="panel">
       <header>
@@ -31,8 +32,8 @@ export function Panel({ summary, summaryError, zoom, visible, onToggle, selectio
 
       <section>
         <h2>Loaded</h2>
-        {summaryError ? (
-          <p className="error">Couldn't reach the API: {summaryError}</p>
+        {loadError ? (
+          <p className="error">Couldn't reach the API: {loadError}</p>
         ) : !summary ? (
           <p className="muted">Loading…</p>
         ) : summary.tract_count === 0 ? (
@@ -56,7 +57,7 @@ export function Panel({ summary, summaryError, zoom, visible, onToggle, selectio
       <section>
         <h2>Layers</h2>
         {(Object.keys(LAYER_LABELS) as (keyof LayerVisibility)[]).map((layer) => {
-          const minZoom = layer === 'imagery' ? 0 : MIN_ZOOM[layer]
+          const minZoom = layer === 'imagery' ? 0 : (tileSources?.[layer].minzoom ?? 0)
           return (
             <label key={layer} className="toggle">
               <input type="checkbox" checked={visible[layer]} onChange={() => onToggle(layer)} />

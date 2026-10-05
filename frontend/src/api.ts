@@ -39,6 +39,16 @@ export const fetchTract = (id: number, signal?: AbortSignal) =>
 export const fetchStructure = (id: number, signal?: AbortSignal) =>
   getJson<StructureDetail>(`/api/structures/${id}/`, signal)
 
-// MapLibre fetches tiles itself and needs absolute URLs.
-export const tileUrl = (layer: 'tracts' | 'structures') =>
-  `${window.location.origin}/tiles/${layer}/{z}/{x}/{y}.mvt`
+// TileJSON 3.0.0, the subset this app reads. The server builds it in src/wuixpose/core/tiles.py.
+export interface TileJSON {
+  tilejson: string
+  name: string
+  tiles: string[]
+  minzoom: number
+  maxzoom: number
+  attribution?: string
+  vector_layers: { id: string; fields: Record<string, string>; minzoom?: number; maxzoom?: number }[]
+}
+
+export const fetchTileJson = (layer: string, signal?: AbortSignal) =>
+  getJson<TileJSON>(`/tiles/${layer}.json`, signal)

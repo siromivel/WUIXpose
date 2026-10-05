@@ -4,6 +4,7 @@ import mapbox_vector_tile
 import pytest
 from django.urls import reverse
 
+from wuixpose.core import tiles
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import Structure, Tract
 
@@ -73,9 +74,63 @@ def test_tiles_below_layer_min_zoom_are_empty(client, loaded):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(("layer", "z", "x", "y"), [("roads", 15, 0, 0), ("tracts", 15, 2**15, 0), ("tracts", 23, 0, 0)])
+@pytest.mark.parametrize(
+    ("layer", "z", "x", "y"),
+    [("roads", 15, 0, 0), ("tracts", 15, 2**15, 0), ("tracts", 17, 0, 0)],
+)
 def test_bad_tile_requests_are_404(client, layer, z, x, y):
     assert get_tile(client, layer, z, x, y).status_code == 404
+
+
+@pytest.mark.django_db
+def test_tile_cache_lifetime_comes_from_settings(client, loaded, settings):
+    settings.WUIXPOSE_TILE_CACHE_SECONDS = 42
+
+    response = get_tile(client, "tracts", *tile_for(*ORIGIN, 15))
+
+    assert response["Cache-Control"] == "public, max-age=42"
+
+
+# TileJSON
+
+
+@pytest.mark.parametrize("layer", ["tracts", "structures"])
+def test_tilejson_describes_the_layer_from_its_definition(client, layer):
+    spec = tiles.LAYERS[layer]
+
+    data = client.get(reverse("tilejson", args=[layer])).json()
+
+    assert data["tilejson"] == "3.0.0"
+    assert data["tiles"] == [f"http://testserver/tiles/{layer}/{{z}}/{{x}}/{{y}}.mvt"]
+    assert (data["minzoom"], data["maxzoom"]) == (spec.min_zoom, spec.max_zoom)
+    assert "Boulder County" in data["attribution"]
+    assert data["vector_layers"] == [
+        {"id": layer, "fields": spec.fields, "minzoom": spec.min_zoom, "maxzoom": spec.max_zoom}
+    ]
+
+
+@pytest.mark.django_db
+def test_tilejson_fields_match_what_tiles_carry(client, loaded):
+    for layer in ("tracts", "structures"):
+        tilejson = client.get(reverse("tilejson", args=[layer])).json()
+        response = get_tile(client, layer, *tile_for(*ORIGIN, 15))
+
+        features = mapbox_vector_tile.decode(response.content)[layer]["features"]
+        assert features
+        for feat in features:
+            assert set(feat["properties"]) <= set(tilejson["vector_layers"][0]["fields"])
+
+
+def test_tilejson_tile_urls_follow_the_request_host(client, settings):
+    settings.ALLOWED_HOSTS = ["localhost"]
+
+    data = client.get(reverse("tilejson", args=["tracts"]), HTTP_HOST="localhost:5173").json()
+
+    assert data["tiles"] == ["http://localhost:5173/tiles/tracts/{z}/{x}/{y}.mvt"]
+
+
+def test_tilejson_unknown_layer_is_404(client):
+    assert client.get(reverse("tilejson", args=["roads"])).status_code == 404
 
 
 # Detail and summary endpoints

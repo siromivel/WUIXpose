@@ -9,11 +9,11 @@ import urllib.request
 from collections.abc import Callable, Iterator
 from typing import Any
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 FetchJson = Callable[[str, dict[str, str]], dict[str, Any]]
-
-USER_AGENT = "WUIXpose ingest (+https://github.com/siromivel/wuixpose)"
 
 
 class ArcGISError(RuntimeError):
@@ -23,7 +23,7 @@ class ArcGISError(RuntimeError):
 def fetch_json(url: str, params: dict[str, str], *, attempts: int = 3, timeout: float = 120) -> dict[str, Any]:
     """GET url?params as JSON, retrying transient network errors with backoff."""
     full_url = f"{url}?{urllib.parse.urlencode(params)}"
-    request = urllib.request.Request(full_url, headers={"User-Agent": USER_AGENT})
+    request = urllib.request.Request(full_url, headers={"User-Agent": settings.WUIXPOSE_INGEST_USER_AGENT})
     for attempt in range(1, attempts + 1):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:

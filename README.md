@@ -43,6 +43,7 @@ Prerequisites: uv, Node 22, Docker, and the GDAL/GEOS libraries that GeoDjango l
 (`brew install gdal` on macOS, `apt install gdal-bin` on Debian/Ubuntu).
 
 ```bash
+cp .env.example .env     # local settings: DEBUG on, defaults matching compose.yaml
 docker compose up -d     # Postgres/PostGIS on :5432, Redis on :6379
 uv sync                  # create .venv and install dependencies
 
@@ -76,10 +77,29 @@ Lot lines appear from zoom 12 and structures from zoom 13.
 
 | Path | Returns |
 | --- | --- |
+| `/tiles/{tracts,structures}.json` | [TileJSON](https://github.com/mapbox/tilejson-spec/tree/master/3.0.0): tile URL template, zoom range, attribution, feature properties |
 | `/tiles/{tracts,structures}/{z}/{x}/{y}.mvt` | Vector tiles; feature ids are model ids |
 | `/api/summary/` | Counts and the bounding box of loaded tracts |
 | `/api/tracts/<id>/` | County parcel numbers, acreage, structure ids |
 | `/api/structures/<id>/` | Source ID, tract, footprint square feet |
+
+Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
+frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`.
+
+## Configuration
+
+Settings come from environment variables, with `.env` at the repo root filling in any that
+aren't set. `.env.example` lists them all.
+
+- `DJANGO_DEBUG` defaults to off. With it off, `DJANGO_SECRET_KEY` is required and
+  `DJANGO_ALLOWED_HOSTS` (comma-separated) defaults to none.
+- `POSTGRES_*` and `REDIS_URL` default to the `compose.yaml` services.
+- `WUIXPOSE_TILE_CACHE_SECONDS` sets `Cache-Control` on tiles and TileJSON (default 300).
+- `WUIXPOSE_INGEST_USER_AGENT` identifies ingest requests to county GIS servers.
+
+The frontend reads `VITE_*` variables at build time for the basemap style, imagery tiles and
+default map center; `frontend/.env.example` lists them, and `frontend/src/config.ts` holds the
+defaults.
 
 ## Checks
 

@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 COUNTY_FIPS = "08013"
 PARCELS_URL = "https://maps.bouldercounty.org/arcgis/rest/services/Emap/BOCO_Parcels/MapServer/0"
 FOOTPRINTS_URL = "https://maps.bouldercounty.org/arcgis/rest/services/PARCELS/BUILDINGS_STRUCTURE_FOOTPRINT/MapServer/0"
+# Credit required by CC BY 4.0 wherever this data is shown. HTML, as map clients render it.
+ATTRIBUTION = (
+    'Parcels and footprints: <a href="https://opendata-bouldercounty.hub.arcgis.com/">Boulder County</a>, '
+    '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>'
+)
 
 # A structure belongs to the tract holding at least this share of its footprint. Lot lines and
 # footprints are digitized separately, so a house wholly on one lot often pokes a few percent

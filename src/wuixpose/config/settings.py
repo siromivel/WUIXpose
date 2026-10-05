@@ -10,23 +10,32 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import os
 from pathlib import Path
+
+import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+REPO_ROOT = BASE_DIR.parent.parent
 
+# Configuration comes from the environment. For local development, copy .env.example to .env
+# at the repo root; real environment variables take precedence over the file.
+env = environ.Env()
+environ.Env.read_env(env.str("DJANGO_ENV_FILE", default=str(REPO_ROOT / ".env")))
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# Off unless explicitly turned on, so a missing variable fails safe.
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-&=7=ds-!3t)0c^d=8m7gwj7*=#fr)sv#e5rn7qs(^smrb71_mk'
+if DEBUG:
+    SECRET_KEY = env.str("DJANGO_SECRET_KEY", default="django-insecure-local-development-only")
+else:
+    try:
+        SECRET_KEY = env.str("DJANGO_SECRET_KEY")
+    except ImproperlyConfigured as exc:
+        raise ImproperlyConfigured("Set DJANGO_SECRET_KEY, or DJANGO_DEBUG=true for local development") from exc
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"] if DEBUG else [])
 
 
 # Application definition
@@ -79,18 +88,18 @@ ASGI_APPLICATION = 'wuixpose.config.asgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("POSTGRES_DB", "wuixpose"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "NAME": env.str("POSTGRES_DB", default="wuixpose"),
+        "USER": env.str("POSTGRES_USER", default="postgres"),
+        "PASSWORD": env.str("POSTGRES_PASSWORD", default="postgres"),
+        "HOST": env.str("POSTGRES_HOST", default="localhost"),
+        "PORT": env.str("POSTGRES_PORT", default="5432"),
     }
 }
 
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+        "LOCATION": env.str("REDIS_URL", default="redis://localhost:6379/0"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -138,3 +147,16 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# WUIXpose
+
+# How long browsers and proxies may reuse a vector tile or TileJSON response. Tiles only change
+# when an ingest runs.
+WUIXPOSE_TILE_CACHE_SECONDS = env.int("WUIXPOSE_TILE_CACHE_SECONDS", default=300)
+
+# Sent with requests to upstream GIS servers, so their operators can see who is calling.
+WUIXPOSE_INGEST_USER_AGENT = env.str(
+    "WUIXPOSE_INGEST_USER_AGENT",
+    default="WUIXpose ingest (+https://github.com/siromivel/wuixpose)",
+)

@@ -34,6 +34,8 @@ jobs:
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
+      # Settings refuse to load without a key when DEBUG is off, which it is here.
+      DJANGO_SECRET_KEY: ci-only-not-secret
 
     steps:
       - uses: actions/checkout@v4

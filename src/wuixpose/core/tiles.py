@@ -50,7 +50,7 @@ LAYERS = {
             SELECT t.id,
                    (SELECT i.value
                       FROM core_tractidentifier i
-                     WHERE i.tract_id = t.id AND i.scheme = 'county_apn' AND i.valid_to IS NULL
+                     WHERE i.tract_id = t.id AND i.scheme = 'county_apn' AND i.tracked_to IS NULL
                      ORDER BY i.id
                      LIMIT 1) AS apn,
                    {MVT_GEOM.format(col="t.geom")} AS mvt_geom

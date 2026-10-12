@@ -48,6 +48,7 @@ class Command(BaseCommand):
         except ArcGISError as exc:
             raise CommandError(f"Boulder County GIS request failed: {exc}") from exc
 
-        # Either layer changing can change which tract a structure sits in.
-        changed = boulder.assign_structure_tracts()
-        self.stdout.write(self.style.SUCCESS(f"Done. {changed} structure-tract assignments changed."))
+        # Not required for correctness (the next assign_structure_tracts run would find these
+        # changes on its own), but keeps the map consistent as soon as the ingest finishes.
+        result = boulder.assign_structure_tracts()
+        self.stdout.write(self.style.SUCCESS(f"Done. {result}."))

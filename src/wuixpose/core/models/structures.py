@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from django.db.models import Q
+from django.db.models.functions import Now
 
 from .tracts import STORAGE_SRID
 
@@ -24,6 +25,10 @@ class Structure(models.Model):
         blank=True,
         related_name="structures",
     )
+    # When this row's geometry last changed. Maintained by a database trigger (migration 0003),
+    # so every writer gets it, including bulk updates and raw SQL; values written from Python
+    # are ignored. Jobs that depend on geometry use it to find what changed since their last run.
+    geom_updated_at = models.DateTimeField(db_default=Now(), db_index=True, editable=False)
 
     class Meta:
         constraints = (

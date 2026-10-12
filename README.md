@@ -26,9 +26,15 @@ satellite imagery (Sentinel-2).
   (unincorporated county only, Land Use) become structures, keyed by the county's structure ID.
   Demolished footprints are skipped.
 
-Re-running updates geometry in place. A structure is assigned to the tract holding at least 90% of
-its footprint, and left without one otherwise. Parcels or structures that disappear from the
-county data are not yet removed or retired.
+Re-running updates geometry in place. A parcel number is tracked from the day it was first loaded
+(`tracked_from`), which is WUIXpose's date, not the county's date of record. Parcels or structures
+that disappear from the county data are not yet removed or retired.
+
+A structure is assigned to the tract holding at least 90% of its footprint, and left without one
+otherwise. `manage.py assign_structure_tracts` does the assignment and reconsiders only structures
+whose own geometry, or a nearby tract's, changed since its last run; database triggers record those
+changes (`geom_updated_at`) whatever writes them. The ingest runs it when it finishes. Pass `--full`
+to reconsider everything, e.g. after changing the 90% rule.
 
 ## Stack
 

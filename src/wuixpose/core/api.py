@@ -33,7 +33,7 @@ class TractSerializer(serializers.ModelSerializer):
         fields = ("id", "county_apns", "area_acres", "structure_ids")
 
     def get_county_apns(self, tract: Tract) -> list[str]:
-        return [i.value for i in tract.identifiers.all() if i.valid_to is None]
+        return [i.value for i in tract.identifiers.all() if i.tracked_to is None]
 
     def get_area_acres(self, tract: Tract) -> float:
         return round(area_sq_m(tract.geom) / SQ_M_PER_ACRE, 2)

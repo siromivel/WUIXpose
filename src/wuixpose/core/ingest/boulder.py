@@ -9,14 +9,16 @@ import logging
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection, transaction
+from django.utils import timezone
 
 from wuixpose.core.ingest.arcgis import iter_features
 from wuixpose.core.ingest.geometry import as_multipolygon, multipolygon_from_geojson
-from wuixpose.core.models import Structure, Tract
+from wuixpose.core.models import JobRun, Structure, Tract
 from wuixpose.core.models.tracts import TractIdentifier
 
 logger = logging.getLogger(__name__)
@@ -91,8 +93,12 @@ def _group_by_key(features: Iterable[dict[str, Any]], key_field: str) -> tuple[d
     return merged, skipped
 
 
-def load_tracts(features: Iterable[dict[str, Any]]) -> LoadResult:
-    """Upsert one tract per parcel number, matched through its current county APN identifier."""
+def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None) -> LoadResult:
+    """Upsert one tract per parcel number, matched through its current county APN identifier.
+
+    New identifiers are tracked from `as_of` (default: today); existing ones keep their date.
+    """
+    as_of = as_of or timezone.localdate()
     by_apn, skipped = _group_by_key(features, "PARCEL_NO")
     result = LoadResult(skipped=skipped)
 
@@ -101,7 +107,7 @@ def load_tracts(features: Iterable[dict[str, Any]]) -> LoadResult:
             TractIdentifier.objects.filter(
                 scheme=TractIdentifier.Scheme.COUNTY_APN,
                 county_fips=COUNTY_FIPS,
-                valid_to__isnull=True,
+                tracked_to__isnull=True,
                 value__in=list(by_apn),
             ).values_list("value", "tract_id")
         )
@@ -119,6 +125,7 @@ def load_tracts(features: Iterable[dict[str, Any]]) -> LoadResult:
                     scheme=TractIdentifier.Scheme.COUNTY_APN,
                     county_fips=COUNTY_FIPS,
                     value=apn,
+                    tracked_from=as_of,
                 )
                 for apn, tract in zip(new_apns, tracts, strict=True)
             ],
@@ -150,31 +157,91 @@ def load_structures(features: Iterable[dict[str, Any]]) -> LoadResult:
     return result
 
 
-def assign_structure_tracts() -> int:
-    """Set each structure's tract by footprint overlap (see MIN_TRACT_SHARE). Returns rows changed.
+@dataclass
+class AssignResult:
+    changed: int
+    full: bool
+
+    def __str__(self) -> str:
+        scope = "full pass" if self.full else "changes since last run"
+        return f"{self.changed} structure-tract assignments changed ({scope})"
+
+
+# Structures whose assignment may have changed since `since`: their own geometry changed, the
+# tract they're assigned to changed (it may have shrunk away from them), or a changed tract now
+# overlaps them (it may have grown onto them).
+_CHANGED_CANDIDATES = """
+    WITH changed_tracts AS (
+        SELECT id, geom FROM core_tract WHERE geom_updated_at >= %(since)s
+    )
+    SELECT id FROM core_structure WHERE geom_updated_at >= %(since)s
+    UNION
+    SELECT s.id FROM core_structure s JOIN changed_tracts ct ON s.tract_id = ct.id
+    UNION
+    SELECT s.id FROM core_structure s JOIN changed_tracts ct ON ST_Intersects(ct.geom, s.geom)
+"""
+_ALL_CANDIDATES = "SELECT id FROM core_structure"
+
+_ASSIGN = """
+    WITH candidates AS ({candidates}),
+    best AS (
+        SELECT s.id AS structure_id, t.id AS tract_id
+          FROM candidates c
+          JOIN core_structure s ON s.id = c.id
+          LEFT JOIN LATERAL (
+              SELECT t.id
+                FROM core_tract t
+               CROSS JOIN LATERAL (
+                   -- Most footprints sit wholly inside one lot, where ST_Covers settles the
+                   -- overlap without computing an intersection polygon.
+                   SELECT CASE WHEN ST_Covers(t.geom, s.geom) THEN ST_Area(s.geom)
+                               ELSE ST_Area(ST_Intersection(t.geom, s.geom))
+                          END AS overlap_area
+               ) calc
+               WHERE ST_Intersects(t.geom, s.geom)
+                 AND calc.overlap_area >= %(min_share)s * ST_Area(s.geom)
+               -- Lots don't overlap, so at most one usually qualifies. Stacked parcels (condos
+               -- sharing a lot's outline) can, though, and without a fixed order the pick could
+               -- flip between runs.
+               ORDER BY calc.overlap_area DESC, t.id
+               LIMIT 1
+          ) t ON TRUE
+    )
+    UPDATE core_structure s
+       SET tract_id = best.tract_id
+      FROM best
+     WHERE s.id = best.structure_id
+       AND s.tract_id IS DISTINCT FROM best.tract_id
+"""
+
+
+def assign_structure_tracts(*, full: bool = False) -> AssignResult:
+    """Set structures' tracts by footprint overlap (see MIN_TRACT_SHARE).
+
+    Only structures that could have changed since the last successful run are reconsidered, as
+    found through the trigger-maintained geom_updated_at columns, so this doesn't depend on being
+    run by whatever wrote the geometry. The first run, and any run with `full`, reconsiders every
+    structure; use `full` after changing the assignment rule itself.
+
+    Not caught incrementally: a tract deleted without its replacement changing (its structures
+    are only set to null). Ingests don't delete tracts; a full run covers it if anything does.
 
     Areas are compared in degrees, which is fine for a ratio between shapes a few meters apart.
     """
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            WITH best AS (
-                SELECT s.id AS structure_id,
-                       (SELECT t.id
-                          FROM core_tract t
-                         WHERE t.geom && s.geom
-                           AND ST_Intersects(t.geom, s.geom)
-                           AND ST_Area(ST_Intersection(t.geom, s.geom)) >= %s * ST_Area(s.geom)
-                         ORDER BY ST_Area(ST_Intersection(t.geom, s.geom)) DESC, t.id
-                         LIMIT 1) AS tract_id
-                  FROM core_structure s
-            )
-            UPDATE core_structure s
-               SET tract_id = best.tract_id
-              FROM best
-             WHERE best.structure_id = s.id
-               AND s.tract_id IS DISTINCT FROM best.tract_id
-            """,
-            [MIN_TRACT_SHARE],
+    job = JobRun.Job.ASSIGN_STRUCTURE_TRACTS
+    with transaction.atomic(), connection.cursor() as cursor:
+        # One run at a time, so two runs can't interleave their watermarks.
+        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [job])
+        # The transaction's start, the same clock the geom_updated_at trigger stamps with.
+        cursor.execute("SELECT now()")
+        (started_at,) = cursor.fetchone()
+        since = (
+            None
+            if full
+            else JobRun.objects.filter(job=job).order_by("-started_at").values_list("started_at", flat=True).first()
         )
-        return cursor.rowcount
+        candidates = _ALL_CANDIDATES if since is None else _CHANGED_CANDIDATES
+        cursor.execute(_ASSIGN.format(candidates=candidates), {"since": since, "min_share": MIN_TRACT_SHARE})
+        result = AssignResult(changed=cursor.rowcount, full=since is None)
+        JobRun.objects.create(job=job, started_at=started_at, full=result.full, rows_changed=result.changed)
+    return result

@@ -2,6 +2,7 @@
 
 import django.contrib.gis.db.models.fields
 import django.db.models.deletion
+import django.utils.timezone
 from django.db import migrations, models
 
 
@@ -35,13 +36,13 @@ class Migration(migrations.Migration):
                 ('scheme', models.CharField(choices=[('county_apn', 'County APN')], db_collation='C', max_length=32)),
                 ('county_fips', models.CharField(db_collation='C', max_length=5)),
                 ('value', models.CharField(db_collation='C', max_length=64)),
-                ('valid_from', models.DateField(blank=True, null=True)),
-                ('valid_to', models.DateField(blank=True, null=True)),
+                ('tracked_from', models.DateField(default=django.utils.timezone.localdate)),
+                ('tracked_to', models.DateField(blank=True, null=True)),
                 ('tract', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='identifiers', to='core.tract')),
             ],
             options={
-                'indexes': [models.Index(condition=models.Q(('valid_to__isnull', False)), fields=['scheme', 'county_fips', 'value'], name='tract_identifier_history')],
-                'constraints': [models.UniqueConstraint(condition=models.Q(('valid_to__isnull', True)), fields=('scheme', 'county_fips', 'value'), name='uniq_current_tract_identifier'), models.CheckConstraint(condition=models.Q(('county_fips__regex', '^\\d{5}$')), name='tract_identifier_fips_format'), models.CheckConstraint(condition=models.Q(('valid_from__isnull', True), ('valid_to__isnull', True), ('valid_to__gte', models.F('valid_from')), _connector='OR'), name='tract_identifier_valid_range')],
+                'indexes': [models.Index(condition=models.Q(('tracked_to__isnull', False)), fields=['scheme', 'county_fips', 'value'], name='tract_identifier_history')],
+                'constraints': [models.UniqueConstraint(condition=models.Q(('tracked_to__isnull', True)), fields=('scheme', 'county_fips', 'value'), name='uniq_current_tract_identifier'), models.CheckConstraint(condition=models.Q(('county_fips__regex', '^\\d{5}$')), name='tract_identifier_fips_format'), models.CheckConstraint(condition=models.Q(('tracked_to__isnull', True), ('tracked_to__gte', models.F('tracked_from')), _connector='OR'), name='tract_identifier_tracked_range')],
             },
         ),
         migrations.CreateModel(

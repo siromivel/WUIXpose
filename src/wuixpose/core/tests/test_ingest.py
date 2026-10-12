@@ -1,9 +1,11 @@
 import io
 import json
+from datetime import date
 
 import pytest
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.management import CommandError, call_command
+from django.utils import timezone
 
 from wuixpose.core.ingest import arcgis, boulder
 from wuixpose.core.ingest.geometry import multipolygon_from_geojson
@@ -92,7 +94,7 @@ def test_non_polygonal_geometry_is_dropped():
 
 
 def current_apns():
-    return dict(TractIdentifier.objects.filter(valid_to__isnull=True).values_list("value", "tract_id"))
+    return dict(TractIdentifier.objects.filter(tracked_to__isnull=True).values_list("value", "tract_id"))
 
 
 @pytest.mark.django_db
@@ -140,6 +142,24 @@ def test_reloading_tracts_updates_geometry_in_place():
     assert tract.geom.equals(multipolygon(box(0, 0, 0.002, 0.001)))
 
 
+@pytest.mark.django_db
+def test_new_identifiers_are_tracked_from_the_load_date():
+    boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))], as_of=date(2026, 10, 5))
+    boulder.load_tracts([feature({"PARCEL_NO": "B"}, box(0.001, 0, 0.002, 0.001))])
+
+    tracked_from = dict(TractIdentifier.objects.values_list("value", "tracked_from"))
+    assert tracked_from == {"A": date(2026, 10, 5), "B": timezone.localdate()}
+
+
+@pytest.mark.django_db
+def test_reloading_tracts_keeps_identifier_tracked_from():
+    boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))], as_of=date(2026, 10, 5))
+
+    boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.002, 0.001))], as_of=date(2026, 10, 12))
+
+    assert TractIdentifier.objects.get().tracked_from == date(2026, 10, 5)
+
+
 # Loading structures
 
 
@@ -185,12 +205,12 @@ def test_structures_are_assigned_to_the_tract_holding_their_footprint():
     )
     apns = current_apns()
 
-    changed = boulder.assign_structure_tracts()
+    result = boulder.assign_structure_tracts()
 
     tract_of = dict(Structure.objects.values_list("source_id", "tract_id"))
     assert tract_of == {"inside-a": apns["A"], "mostly-a": apns["A"], "straddles": None, "outside": None}
-    assert changed == 2
-    assert boulder.assign_structure_tracts() == 0
+    assert result.changed == 2
+    assert boulder.assign_structure_tracts().changed == 0
 
 
 # Management command

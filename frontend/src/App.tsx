@@ -23,7 +23,7 @@ async function loadMapData(signal: AbortSignal): Promise<MapData> {
 export default function App() {
   const [mapData, setMapData] = useState<MapData | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [visible, setVisible] = useState<LayerVisibility>({ tracts: true, structures: true, imagery: false })
+  const [visible, setVisible] = useState<LayerVisibility>({ tracts: true, structures: true, zones: true, imagery: false })
   const [selection, setSelection] = useState<Selection>(null)
   const [zoom, setZoom] = useState(0)
 

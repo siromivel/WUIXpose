@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { type StructureDetail, type Summary, type TractDetail, fetchStructure, fetchTract } from './api'
-import { type LayerVisibility, type Selection, type TileSources } from './layers'
+import { type LayerVisibility, type Selection, type TileSources, ZONE_RINGS } from './layers'
 
 interface Props {
   summary: Summary | null
@@ -17,6 +17,7 @@ interface Props {
 const LAYER_LABELS: Record<keyof LayerVisibility, string> = {
   tracts: 'Lot lines',
   structures: 'Structures',
+  zones: 'Mitigation zones',
   imagery: 'Aerial imagery',
 }
 
@@ -27,7 +28,7 @@ export function Panel({ summary, tileSources, loadError, zoom, visible, onToggle
     <aside className="panel">
       <header>
         <h1>WUIXpose</h1>
-        <p className="subtitle">Wildfire mitigation for homes in the wildland-urban interface</p>
+        <p className="subtitle">Wildfire mitigation assessment for homes in the wildland-urban interface</p>
       </header>
 
       <section>
@@ -66,6 +67,17 @@ export function Panel({ summary, tileSources, loadError, zoom, visible, onToggle
             </label>
           )
         })}
+        {visible.zones && (
+          <ul className="legend">
+            {ZONE_RINGS.map((ring) => (
+              <li key={ring.key}>
+                <span className="swatch" style={{ background: ring.color }} />
+                {ring.label}
+                <span className="range">{ring.range} from the structure</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="selection">
@@ -136,8 +148,13 @@ function StructureCard({ id, onSelectTract }: { id: number; onSelectTract: (id: 
           {structure.tract === null ? (
             <span className="muted">none (straddles a lot line or outside parcel data)</span>
           ) : (
-            <button type="button" className="link" onClick={() => onSelectTract(structure.tract!)}>
-              Select its lot
+            <button
+              type="button"
+              className="link"
+              title="Select this lot"
+              onClick={() => onSelectTract(structure.tract!)}
+            >
+              {structure.tract_county_apns.join(', ') || 'Select its lot'}
             </button>
           )}
         </dd>

@@ -1,6 +1,7 @@
 import {
   type ExpressionSpecification,
   type FeatureIdentifier,
+  type FilterSpecification,
   type MapGeoJSONFeature,
   Map as MapLibreMap,
   NavigationControl,
@@ -14,7 +15,14 @@ import { useEffect, useRef, useState } from 'react'
 
 import type { Bbox } from './api'
 import { config } from './config'
-import { type LayerVisibility, type Selection, TILE_LAYERS, type TileSources } from './layers'
+import {
+  type LayerVisibility,
+  type Selection,
+  TILE_LAYERS,
+  type TileSources,
+  ZONE_FALLBACK_COLOR,
+  ZONE_RINGS,
+} from './layers'
 
 // MapLibre looks for its worker next to its own module file, which isn't where Vite puts
 // either one. Let Vite bundle the worker and tell MapLibre where it went.
@@ -40,9 +48,34 @@ const COLORS = {
   tractSelected: '#1d3557',
   structure: '#e07a2f',
   structureSelected: '#9d2d0f',
+  zonesSelected: '#1d2733',
 }
 
 const selected: ExpressionSpecification = ['boolean', ['feature-state', 'selected'], false]
+
+// A value chosen by the feature's ring, as a style expression.
+function byRing<T extends string | number>(
+  value: (ring: (typeof ZONE_RINGS)[number], index: number) => T,
+  fallback: T,
+): ExpressionSpecification {
+  return ZONE_RINGS.reduceRight<ExpressionSpecification>(
+    (otherwise, ring, i) => ['case', ['==', ['get', 'ring_key'], ring.key], value(ring, i), otherwise],
+    ['literal', fallback],
+  )
+}
+
+const ringColor = byRing((ring) => ring.color, ZONE_FALLBACK_COLOR)
+// Zones of neighboring structures overlap, and the ring nearer its own structure ranks higher:
+// a spot 5 ft from one building and 50 ft from another is zone 1.
+const ringRank = byRing((_, i) => ZONE_RINGS.length - i, 0)
+// Meters. Enough to order the rings in the depth buffer, too little to see when the map is tilted.
+const ZONE_SLAB_STEP = 0.25
+
+// Zones belonging to the selection: a structure's own, or those of every structure on a lot.
+function zonesOf(selection: Selection): FilterSpecification {
+  if (!selection) return false
+  return ['==', ['get', selection.kind === 'structure' ? 'structure_id' : 'tract_id'], selection.id]
+}
 
 function addDataLayers(map: MapLibreMap, tileSources: TileSources) {
   map.addSource('imagery', {
@@ -87,6 +120,41 @@ function addDataLayers(map: MapLibreMap, tileSources: TileSources) {
       'line-width': ['interpolate', ['linear'], ['zoom'], 12, ['case', selected, 2, 0.4], 17, ['case', selected, 3, 1.4]],
     },
   })
+  // The shading says which zone the ground is in, so it is the same however many structures'
+  // rings cover a spot, and where different rings overlap the higher-ranked one shows alone. A
+  // fill layer can't do that: its overlapping features always blend. A fill-extrusion layer
+  // applies its opacity to the layer as a whole and colors only the topmost surface, so the
+  // rings are drawn as slabs, higher-ranked ones slightly taller.
+  map.addLayer({
+    id: 'zones-fill',
+    type: 'fill-extrusion',
+    source: 'zones',
+    'source-layer': 'zones',
+    paint: {
+      'fill-extrusion-color': ringColor,
+      'fill-extrusion-height': ['*', ringRank, ZONE_SLAB_STEP],
+      'fill-extrusion-opacity': 0.3,
+    },
+  })
+  // Extrusions are shaded by the style's light, which brightens dark colors; with no intensity
+  // the zones stay the colors the legend shows.
+  map.setLight({ anchor: 'viewport', intensity: 0 })
+  // The ground the selection's zones cover, darkened so it stands out among its neighbors'. One
+  // neutral color at one height, so it darkens evenly and leaves each zone's color as it was;
+  // above every zone slab, because extrusion layers share a depth buffer and a lower one would
+  // be hidden by them.
+  map.addLayer({
+    id: 'zones-selected-fill',
+    type: 'fill-extrusion',
+    source: 'zones',
+    'source-layer': 'zones',
+    filter: zonesOf(null),
+    paint: {
+      'fill-extrusion-color': COLORS.zonesSelected,
+      'fill-extrusion-height': (ZONE_RINGS.length + 1) * ZONE_SLAB_STEP,
+      'fill-extrusion-opacity': 0.25,
+    },
+  })
   map.addLayer({
     id: 'structures-fill',
     type: 'fill',
@@ -109,9 +177,12 @@ function addDataLayers(map: MapLibreMap, tileSources: TileSources) {
   })
 }
 
+// Listed bottom to top: this order is the drawing order once the layers are moved under the
+// basemap's labels.
 const LAYER_IDS: Record<keyof LayerVisibility, string[]> = {
   imagery: ['imagery'],
   tracts: ['tracts-fill', 'tracts-line'],
+  zones: ['zones-fill', 'zones-selected-fill'],
   structures: ['structures-fill', 'structures-line'],
 }
 
@@ -213,6 +284,10 @@ export function MapView({ initialBbox, tileSources, visible, selection, onSelect
       // Skipped when the map itself is being torn down.
       if (map.getSource(id.source)) map.removeFeatureState(id, 'selected')
     }
+  }, [map, selection])
+
+  useEffect(() => {
+    if (map) map.setFilter('zones-selected-fill', zonesOf(selection))
   }, [map, selection])
 
   return <div ref={container} className="map" />

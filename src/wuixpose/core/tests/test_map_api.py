@@ -4,9 +4,9 @@ import mapbox_vector_tile
 import pytest
 from django.urls import reverse
 
-from wuixpose.core import tiles
+from wuixpose.core import tiles, zones
 from wuixpose.core.ingest import boulder
-from wuixpose.core.models import Structure, Tract
+from wuixpose.core.models import Structure, Tract, Zone
 
 from .factories import ORIGIN, box, feature
 
@@ -30,6 +30,7 @@ def loaded():
     )
     boulder.load_structures([feature({"StructureID": "1N7116110001"}, box(0.0002, 0.0002, 0.0004, 0.0003))])
     boulder.assign_structure_tracts()
+    zones.build_zones()
     return {
         "tract": Tract.objects.get(identifiers__value="146100000001"),
         "structure": Structure.objects.get(),
@@ -64,6 +65,23 @@ def test_structure_tile_carries_tract_id(client, loaded):
 
 
 @pytest.mark.django_db
+def test_zone_tile_carries_the_ring_and_whose_it_is(client, loaded):
+    structure = loaded["structure"]
+    # Rings drawn under earlier rules are kept, but not served.
+    Zone.objects.create(structure=structure, ring_key="hiz_0_5", rule_version=0, geom=structure.geom)
+
+    response = get_tile(client, "zones", *tile_for(*ORIGIN, 15))
+
+    features = mapbox_vector_tile.decode(response.content)["zones"]["features"]
+    current = structure.zones.filter(rule_version=zones.RULE_VERSION)
+    assert sorted(f["id"] for f in features) == sorted(z.pk for z in current)
+    assert sorted(f["properties"]["ring_key"] for f in features) == sorted(ring.key for ring in zones.RINGS)
+    for feat in features:
+        assert feat["properties"]["structure_id"] == structure.pk
+        assert feat["properties"]["tract_id"] == loaded["tract"].pk
+
+
+@pytest.mark.django_db
 def test_tile_away_from_data_is_empty(client, loaded):
     assert get_tile(client, "tracts", *tile_for(-100.0, 35.0, 15)).status_code == 204
 
@@ -94,7 +112,7 @@ def test_tile_cache_lifetime_comes_from_settings(client, loaded, settings):
 # TileJSON
 
 
-@pytest.mark.parametrize("layer", ["tracts", "structures"])
+@pytest.mark.parametrize("layer", ["tracts", "structures", "zones"])
 def test_tilejson_describes_the_layer_from_its_definition(client, layer):
     spec = tiles.LAYERS[layer]
 
@@ -111,7 +129,7 @@ def test_tilejson_describes_the_layer_from_its_definition(client, layer):
 
 @pytest.mark.django_db
 def test_tilejson_fields_match_what_tiles_carry(client, loaded):
-    for layer in ("tracts", "structures"):
+    for layer in ("tracts", "structures", "zones"):
         tilejson = client.get(reverse("tilejson", args=[layer])).json()
         response = get_tile(client, layer, *tile_for(*ORIGIN, 15))
 
@@ -156,10 +174,20 @@ def test_structure_detail(client, loaded):
     data = client.get(reverse("structure-detail", args=[structure.pk])).json()
 
     assert data["tract"] == loaded["tract"].pk
+    assert data["tract_county_apns"] == ["146100000001"]
     assert data["source"] == "boco_footprints"
     assert data["source_id"] == "1N7116110001"
     # ~17 m x 11 m.
     assert data["footprint_sq_ft"] == pytest.approx(2040, rel=0.05)
+
+
+@pytest.mark.django_db
+def test_structure_detail_without_a_tract(client):
+    boulder.load_structures([feature({"StructureID": "S"}, box(0.0002, 0.0002, 0.0004, 0.0003))])
+
+    data = client.get(reverse("structure-detail", args=[Structure.objects.get().pk])).json()
+
+    assert (data["tract"], data["tract_county_apns"]) == (None, [])
 
 
 @pytest.mark.django_db

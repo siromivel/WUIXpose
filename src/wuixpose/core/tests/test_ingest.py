@@ -237,6 +237,7 @@ def test_ingest_command_loads_both_layers(monkeypatch):
     structure = Structure.objects.get()
     assert structure.tract == Tract.objects.get()
     assert "1 structure-tract assignments changed" in out.getvalue()
+    assert "3 zones built or redrawn" in out.getvalue()
 
 
 def test_ingest_command_rejects_malformed_bbox():

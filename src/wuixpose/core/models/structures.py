@@ -45,14 +45,16 @@ class Structure(models.Model):
 
 
 class Zone(models.Model):
-    """One ring around one structure, computed in code from the structure's footprint.
+    """One ring around one structure, computed in code from the structure's footprint (zones.py).
 
     Rows are never rewritten when ring rules change: a new rule_version produces new rows, so
-    observations taken on old geometry stay attached to that geometry. Not clipped to tracts.
+    observations taken on old geometry stay attached to that geometry. A row is rewritten when
+    its structure's footprint changes. Not clipped to tracts, nor to neighboring structures'
+    zones, so zones of nearby structures overlap.
     """
 
     structure = models.ForeignKey(Structure, on_delete=models.CASCADE, related_name="zones")
-    ring_key = models.CharField(max_length=32, db_collation="C")  # e.g. "hiz_0_5"; defined in code
+    ring_key = models.CharField(max_length=32, db_collation="C")  # e.g. "hiz_0_5"; zones.RINGS
     rule_version = models.PositiveIntegerField()
     geom = models.MultiPolygonField(srid=STORAGE_SRID)
 

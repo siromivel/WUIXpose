@@ -23,6 +23,10 @@ def area_sq_m(geom: GEOSGeometry) -> float:
     return geom.transform(EQUAL_AREA_SRID, clone=True).area
 
 
+def county_apns(tract: Tract) -> list[str]:
+    return [i.value for i in tract.identifiers.all() if i.tracked_to is None]
+
+
 class TractSerializer(serializers.ModelSerializer):
     county_apns = serializers.SerializerMethodField()
     area_acres = serializers.SerializerMethodField()
@@ -33,7 +37,7 @@ class TractSerializer(serializers.ModelSerializer):
         fields = ("id", "county_apns", "area_acres", "structure_ids")
 
     def get_county_apns(self, tract: Tract) -> list[str]:
-        return [i.value for i in tract.identifiers.all() if i.tracked_to is None]
+        return county_apns(tract)
 
     def get_area_acres(self, tract: Tract) -> float:
         return round(area_sq_m(tract.geom) / SQ_M_PER_ACRE, 2)
@@ -43,11 +47,15 @@ class TractSerializer(serializers.ModelSerializer):
 
 
 class StructureSerializer(serializers.ModelSerializer):
+    tract_county_apns = serializers.SerializerMethodField()
     footprint_sq_ft = serializers.SerializerMethodField()
 
     class Meta:
         model = Structure
-        fields = ("id", "source", "source_id", "tract", "footprint_sq_ft")
+        fields = ("id", "source", "source_id", "tract", "tract_county_apns", "footprint_sq_ft")
+
+    def get_tract_county_apns(self, structure: Structure) -> list[str]:
+        return county_apns(structure.tract) if structure.tract else []
 
     def get_footprint_sq_ft(self, structure: Structure) -> int:
         return round(area_sq_m(structure.geom) * SQ_FT_PER_SQ_M)
@@ -61,7 +69,8 @@ def tract_detail(request, pk: int):
 
 @api_view(["GET"])
 def structure_detail(request, pk: int):
-    return Response(StructureSerializer(get_object_or_404(Structure, pk=pk)).data)
+    structure = get_object_or_404(Structure.objects.prefetch_related("tract__identifiers"), pk=pk)
+    return Response(StructureSerializer(structure).data)
 
 
 @api_view(["GET"])

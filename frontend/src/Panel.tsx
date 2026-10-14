@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { type StructureDetail, type Summary, type TractDetail, fetchStructure, fetchTract } from './api'
+import { type Address, type StructureDetail, type Summary, type TractDetail, fetchStructure, fetchTract } from './api'
 import { type LayerVisibility, type Selection, type TileSources, ZONE_RINGS } from './layers'
 
 interface Props {
@@ -50,6 +50,10 @@ export function Panel({ summary, tileSources, loadError, zoom, visible, onToggle
             <div>
               <dt>Structures</dt>
               <dd>{number.format(summary.structure_count)}</dd>
+            </div>
+            <div>
+              <dt>Addresses</dt>
+              <dd>{number.format(summary.address_count)}</dd>
             </div>
           </dl>
         )}
@@ -109,6 +113,29 @@ function useDetail<T>(id: number, load: (id: number, signal: AbortSignal) => Pro
   return state?.id === id ? state : null
 }
 
+// Lots like apartment complexes carry hundreds of addresses; show the first few.
+const ADDRESSES_SHOWN = 3
+
+function AddressList({ addresses }: { addresses: Address[] }) {
+  if (addresses.length === 0) return <p className="muted address">No address on record</p>
+  const shown = addresses.slice(0, ADDRESSES_SHOWN)
+  // Units on one lot usually share a city and ZIP; repeat it only when they differ.
+  const sameLine2 = shown.every((a) => a.line2 === shown[0].line2)
+  return (
+    <ul className="addresses">
+      {shown.map((a, i) => (
+        <li key={a.id}>
+          {a.line1}
+          {(!sameLine2 || i === shown.length - 1) && <span className="line2">{a.line2}</span>}
+        </li>
+      ))}
+      {addresses.length > shown.length && (
+        <li className="muted">and {number.format(addresses.length - shown.length)} more</li>
+      )}
+    </ul>
+  )
+}
+
 function TractCard({ id }: { id: number }) {
   const state = useDetail<TractDetail>(id, fetchTract)
   if (!state) return <p className="muted">Loading…</p>
@@ -117,6 +144,7 @@ function TractCard({ id }: { id: number }) {
   return (
     <div className="card">
       <h3>Lot</h3>
+      <AddressList addresses={tract.addresses} />
       <dl>
         <dt>County parcel no.</dt>
         <dd>{tract.county_apns.join(', ') || '—'}</dd>
@@ -138,6 +166,7 @@ function StructureCard({ id, onSelectTract }: { id: number; onSelectTract: (id: 
   return (
     <div className="card">
       <h3>Structure</h3>
+      {structure.tract !== null && <AddressList addresses={structure.tract_addresses} />}
       <dl>
         <dt>Footprint</dt>
         <dd>{number.format(structure.footprint_sq_ft)} sq ft</dd>

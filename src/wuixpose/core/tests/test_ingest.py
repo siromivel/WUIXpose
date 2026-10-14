@@ -10,10 +10,10 @@ from django.utils import timezone
 
 from wuixpose.core.ingest import arcgis, boulder
 from wuixpose.core.ingest.geometry import UnreadableGeometry, multipolygon_from_geojson
-from wuixpose.core.models import RejectedFeature, Structure, Tract
+from wuixpose.core.models import Address, RejectedFeature, Structure, Tract
 from wuixpose.core.models.tracts import TractIdentifier
 
-from .factories import box, feature, multipolygon
+from .factories import address_props, box, feature, multipolygon, point_feature
 
 
 class FakeServer:
@@ -283,7 +283,7 @@ def test_structures_are_assigned_to_the_tract_holding_their_footprint():
 
 
 @pytest.mark.django_db
-def test_ingest_command_loads_both_layers(monkeypatch):
+def test_ingest_command_loads_all_layers(monkeypatch):
     seen_bbox = []
 
     def fake_parcels(bbox, **kwargs):
@@ -293,8 +293,12 @@ def test_ingest_command_loads_both_layers(monkeypatch):
     def fake_footprints(bbox, **kwargs):
         return [feature({"StructureID": "S1"}, box(0.0001, 0.0001, 0.0002, 0.0002))]
 
+    def fake_addresses(bbox, **kwargs):
+        return [point_feature(address_props("1", "12", "MAIN", "A"), 0.0005, 0.0005)]
+
     monkeypatch.setattr(boulder, "fetch_parcels", fake_parcels)
     monkeypatch.setattr(boulder, "fetch_footprints", fake_footprints)
+    monkeypatch.setattr(boulder, "fetch_addresses", fake_addresses)
     out = io.StringIO()
 
     call_command("ingest_boulder", "--bbox=-105.5,40.0,-105.3,40.1", stdout=out)
@@ -302,8 +306,10 @@ def test_ingest_command_loads_both_layers(monkeypatch):
     assert seen_bbox == [(-105.5, 40.0, -105.3, 40.1)]
     structure = Structure.objects.get()
     assert structure.tract == Tract.objects.get()
+    assert Address.objects.get().tract == Tract.objects.get()
     assert "1 structure-tract assignments changed" in out.getvalue()
     assert "3 zones built or redrawn" in out.getvalue()
+    assert "1 address-tract links changed" in out.getvalue()
 
 
 def test_ingest_command_rejects_malformed_bbox():

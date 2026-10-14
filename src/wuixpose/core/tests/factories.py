@@ -23,3 +23,14 @@ def feature(props: dict, *rings: list[list[float]]) -> dict:
 
 def multipolygon(ring: list[list[float]]) -> MultiPolygon:
     return MultiPolygon(Polygon(ring), srid=STORAGE_SRID)
+
+
+def point_feature(props: dict, x: float, y: float) -> dict:
+    """A GeoJSON Point Feature offset from ORIGIN by (x, y) degrees."""
+    ox, oy = ORIGIN
+    return {"type": "Feature", "geometry": {"type": "Point", "coordinates": [ox + x, oy + y]}, "properties": props}
+
+
+def address_props(address_id: str | None, number: str, street: str, apn: str | None = None, **extra) -> dict:
+    """Attributes of a county address point, as the ArcGIS layer returns them."""
+    return {"ADDRESS_ID": address_id, "STREET_NUMBER": number, "STREETNAME": street, "PARCEL_NUMBER": apn} | extra

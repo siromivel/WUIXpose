@@ -4,7 +4,7 @@ from wuixpose.core import zones
 from wuixpose.core.ingest import boulder
 from wuixpose.core.ingest.arcgis import ArcGISError
 
-LAYERS = ("tracts", "structures")
+LAYERS = ("tracts", "structures", "addresses")
 
 
 def parse_bbox(value: str) -> boulder.Bbox:
@@ -18,14 +18,14 @@ def parse_bbox(value: str) -> boulder.Bbox:
 
 
 class Command(BaseCommand):
-    help = "Load Boulder County parcels (as tracts) and building footprints (as structures)."
+    help = "Load Boulder County parcels (as tracts), building footprints (as structures) and address points."
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--layer",
             choices=LAYERS,
             action="append",
-            help="Layer to load; repeat for both. Default: both.",
+            help="Layer to load; repeat for several. Default: all.",
         )
         parser.add_argument(
             "--bbox",
@@ -46,6 +46,10 @@ class Command(BaseCommand):
                 self.stdout.write("Loading building footprints as structures...")
                 result = boulder.load_structures(boulder.fetch_footprints(box, page_size=page_size))
                 self.stdout.write(f"  structures: {result}")
+            if "addresses" in layers:
+                self.stdout.write("Loading address points as addresses...")
+                result = boulder.load_addresses(boulder.fetch_addresses(box, page_size=page_size))
+                self.stdout.write(f"  addresses: {result}")
         except ArcGISError as exc:
             raise CommandError(f"Boulder County GIS request failed: {exc}") from exc
 
@@ -54,4 +58,7 @@ class Command(BaseCommand):
         # ingest finishes.
         assigned = boulder.assign_structure_tracts()
         built = zones.build_zones()
-        self.stdout.write(self.style.SUCCESS(f"Done. {assigned}; {built}."))
+        # Any layer can change which tract an address belongs to: new addresses, new parcel
+        # numbers, or tract shapes moving under an address's point.
+        linked = boulder.link_address_tracts()
+        self.stdout.write(self.style.SUCCESS(f"Done. {assigned}; {built}; {linked} address-tract links changed."))

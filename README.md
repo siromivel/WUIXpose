@@ -11,6 +11,8 @@ satellite imagery (Sentinel-2).
   delegated. For the MVP, a residential lot. County parcel numbers (APNs) are stored separately
   as `TractIdentifier` rows, because they change over time and a tract can have several or none.
 - **Structure**: a building, identified by its footprint, usually within one tract.
+- **Address**: a site address (number, street, unit) at a point, as the county's addressing
+  authority keeps it. Belongs to a tract; a lot can have many (an apartment complex) or none.
 - **Zone**: a ring around a structure at a set distance from its footprint: zone 1 is 0–5 ft,
   zone 2 is 5–30 ft and zone 3 is 30–100 ft. The rings are defined in code (`RINGS` in
   `core/zones.py`) and stored per structure. Zones aren't clipped to tract boundaries, since a
@@ -20,7 +22,7 @@ satellite imagery (Sentinel-2).
 
 ## Data
 
-`manage.py ingest_boulder` loads two Boulder County layers, both published under
+`manage.py ingest_boulder` loads three Boulder County layers, all published under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
 
 - [Parcels](https://opendata-bouldercounty.hub.arcgis.com/datasets/parcels) (countywide, Assessor's
@@ -28,6 +30,10 @@ satellite imagery (Sentinel-2).
 - [Building footprints](https://gis-bouldercounty.opendata.arcgis.com/datasets/648641d4e2a94a7abb967d507814e959_0)
   (unincorporated county only, Land Use) become structures, keyed by the county's structure ID.
   Demolished footprints are skipped.
+- [Address points](https://opendata-bouldercounty.hub.arcgis.com/datasets/687530b74ad54686a98f50337574596f)
+  (countywide, Assessor's Office) become addresses, keyed by the county's address ID. Only active
+  addresses with a house number and street are loaded. The county notes a backlog of new
+  developments not yet addressed.
 
 Re-running updates geometry in place. A parcel number is tracked from the day it was first loaded
 (`tracked_from`), which is WUIXpose's date, not the county's date of record. Parcels or structures
@@ -43,6 +49,17 @@ to reconsider everything, e.g. after changing the 90% rule.
 since its last run. The ingest runs it too. To change the rings, edit `RINGS` and bump
 `RULE_VERSION`: the next run builds every structure's zones under the new version and keeps the
 old rows, and the map serves the new ones.
+
+An address belongs to the tract currently carrying the county parcel number on the address record.
+When no tract does (about 3% of addresses, mostly where the county replatted and the address
+kept the old number), it belongs to the one tract under its point, if exactly one; stacked condo
+parcels under a point leave it without one. The parcel number comes first because rural address
+points can sit on a neighbor's lot at the driveway. Every ingest relinks all addresses (about a
+second for the whole county). Addresses aren't linked to structures yet.
+
+Addresses carry the county's jurisdiction ("Unincorporated Boulder County", "Longmont"), not the
+USPS mailing city, which the county layer doesn't publish: a Gold Hill address shows as
+unincorporated though its mail goes to Boulder.
 
 ## Stack
 
@@ -94,8 +111,8 @@ Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15.
 | `/tiles/{tracts,structures,zones}.json` | [TileJSON](https://github.com/mapbox/tilejson-spec/tree/master/3.0.0): tile URL template, zoom range, attribution, feature properties |
 | `/tiles/{tracts,structures,zones}/{z}/{x}/{y}.mvt` | Vector tiles; feature ids are model ids. Zone tiles hold every structure's rings, overlaps included |
 | `/api/summary/` | Counts and the bounding box of loaded tracts |
-| `/api/tracts/<id>/` | County parcel numbers, acreage, structure ids |
-| `/api/structures/<id>/` | Source ID, tract and its county parcel numbers, footprint square feet |
+| `/api/tracts/<id>/` | Addresses, county parcel numbers, acreage, structure ids |
+| `/api/structures/<id>/` | Source ID, tract and its addresses and county parcel numbers, footprint square feet |
 
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
 frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`.
@@ -131,7 +148,7 @@ uv run pytest                                                         # tests (n
 ```
 src/wuixpose/
   config/   settings, URLs, ASGI/WSGI
-  core/     models (tracts, structures, zones), migrations
+  core/     models (tracts, structures, addresses, zones), migrations
     ingest/   ArcGIS REST client, geometry cleanup, Boulder County loaders
     zones.py  ring definitions and the job that draws them
     tiles.py  vector tiles

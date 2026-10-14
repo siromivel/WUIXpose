@@ -2,17 +2,32 @@ import json
 from collections.abc import Iterable
 from typing import Any
 
-from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
+from django.contrib.gis.gdal import GDALException, OGRGeometry
+from django.contrib.gis.geos import GEOSException, GEOSGeometry, MultiPolygon, Polygon
 
 from wuixpose.core.models.tracts import STORAGE_SRID
 
 
+class UnreadableGeometry(ValueError):
+    """GeoJSON that can't be built into a geometry, or that make_valid can't repair."""
+
+
 def multipolygon_from_geojson(geometry: dict[str, Any] | None) -> MultiPolygon | None:
-    """Parse a GeoJSON geometry into a valid MultiPolygon, or None if nothing polygonal is left."""
+    """Parse a GeoJSON geometry into a valid 2D MultiPolygon, or None if nothing polygonal is left.
+
+    Raises UnreadableGeometry for what can't be repaired at all, such as unclosed rings, missing
+    coordinates or an unknown type, so one bad feature doesn't take down the whole load.
+    """
     if not geometry:
         return None
-    geom = GEOSGeometry(json.dumps(geometry), srid=STORAGE_SRID)
-    return as_multipolygon([geom])
+    try:
+        ogr = OGRGeometry(json.dumps(geometry), srs=STORAGE_SRID)
+        # Geometry columns are 2D; heights or measures from a provider would fail the insert.
+        ogr.set_3d(False)
+        ogr.set_measured(False)
+        return as_multipolygon([ogr.geos])
+    except (GDALException, GEOSException, ValueError) as exc:
+        raise UnreadableGeometry(f"{type(exc).__name__}: {exc}") from exc
 
 
 def as_multipolygon(geoms: Iterable[GEOSGeometry]) -> MultiPolygon | None:

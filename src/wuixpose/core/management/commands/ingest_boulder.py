@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
+from wuixpose.core import zones
 from wuixpose.core.ingest import boulder
 from wuixpose.core.ingest.arcgis import ArcGISError
 
@@ -48,7 +49,9 @@ class Command(BaseCommand):
         except ArcGISError as exc:
             raise CommandError(f"Boulder County GIS request failed: {exc}") from exc
 
-        # Not required for correctness (the next assign_structure_tracts run would find these
-        # changes on its own), but keeps the map consistent as soon as the ingest finishes.
-        result = boulder.assign_structure_tracts()
-        self.stdout.write(self.style.SUCCESS(f"Done. {result}."))
+        # Not required for correctness (the next assign_structure_tracts and build_zones runs
+        # would find these changes on their own), but keeps the map consistent as soon as the
+        # ingest finishes.
+        assigned = boulder.assign_structure_tracts()
+        built = zones.build_zones()
+        self.stdout.write(self.style.SUCCESS(f"Done. {assigned}; {built}."))

@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 from datetime import date
 
 import pytest
@@ -8,8 +9,8 @@ from django.core.management import CommandError, call_command
 from django.utils import timezone
 
 from wuixpose.core.ingest import arcgis, boulder
-from wuixpose.core.ingest.geometry import multipolygon_from_geojson
-from wuixpose.core.models import Structure, Tract
+from wuixpose.core.ingest.geometry import UnreadableGeometry, multipolygon_from_geojson
+from wuixpose.core.models import RejectedFeature, Structure, Tract
 from wuixpose.core.models.tracts import TractIdentifier
 
 from .factories import box, feature, multipolygon
@@ -88,6 +89,31 @@ def test_bowtie_polygon_becomes_valid_multipolygon():
 def test_non_polygonal_geometry_is_dropped():
     assert multipolygon_from_geojson({"type": "LineString", "coordinates": [[0, 0], [1, 1]]}) is None
     assert multipolygon_from_geojson(None) is None
+
+
+UNCLOSED_RING = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1]]]}
+
+
+@pytest.mark.parametrize(
+    "geometry",
+    [
+        pytest.param(UNCLOSED_RING, id="unclosed-ring"),
+        pytest.param({"type": "Polygon", "coordinates": None}, id="null-coordinates"),
+        pytest.param({"type": "Bogus", "coordinates": []}, id="unknown-type"),
+    ],
+)
+def test_unreadable_geometry_raises_typed_error(geometry):
+    with pytest.raises(UnreadableGeometry):
+        multipolygon_from_geojson(geometry)
+
+
+def test_heights_are_dropped():
+    ring = [[0, 0, 5], [1, 0, 5], [1, 1, 5], [0, 1, 5], [0, 0, 5]]
+
+    geom = multipolygon_from_geojson({"type": "Polygon", "coordinates": [ring]})
+
+    assert geom is not None
+    assert not geom.hasz
 
 
 # Loading tracts
@@ -181,6 +207,46 @@ def test_load_structures_upserts_by_county_structure_id():
     assert first.geom.equals(multipolygon(box(0, 0, 0.0002, 0.0001)))
 
 
+@pytest.mark.django_db
+def test_unusable_features_are_skipped_and_recorded(caplog):
+    caplog.set_level(logging.INFO, logger="wuixpose.core.ingest.rejects")
+    features = [
+        feature({"StructureID": "good"}, box(0, 0, 0.0001, 0.0001)),
+        {"type": "Feature", "geometry": UNCLOSED_RING, "properties": {"StructureID": "unclosed"}},
+        feature({"StructureID": "flat"}, [[0, 0], [0, 0], [0, 0], [0, 0]]),
+        feature({"StructureID": None}, box(0.0005, 0, 0.0006, 0.0001)),
+    ]
+
+    result = boulder.load_structures(features)
+
+    assert (result.created, result.skipped) == (1, 3)
+    assert list(Structure.objects.values_list("source_id", flat=True)) == ["good"]
+    rows = {r.source_id: r for r in RejectedFeature.objects.all()}
+    assert {sid: r.reason for sid, r in rows.items()} == {
+        "unclosed": RejectedFeature.Reason.UNREADABLE_GEOMETRY,
+        "flat": RejectedFeature.Reason.NOT_POLYGONAL,
+        None: RejectedFeature.Reason.MISSING_ID,
+    }
+    assert rows["unclosed"].layer == RejectedFeature.Layer.BOCO_FOOTPRINTS
+    assert rows["unclosed"].feature == features[1]
+    assert rows["unclosed"].detail
+    (warning,) = [r for r in caplog.records if r.name == "wuixpose.core.ingest.rejects" and r.levelno == logging.WARNING]
+    assert "unclosed" in warning.getMessage()
+
+
+@pytest.mark.django_db
+def test_rejecting_the_same_feature_again_updates_its_row():
+    bad = {"type": "Feature", "geometry": UNCLOSED_RING, "properties": {"PARCEL_NO": "A"}}
+    boulder.load_tracts([bad, bad])
+    first = RejectedFeature.objects.get()
+
+    boulder.load_tracts([bad])
+
+    again = RejectedFeature.objects.get()
+    assert again.first_seen_at == first.first_seen_at
+    assert again.last_seen_at > first.last_seen_at
+
+
 # Structure-to-tract assignment
 
 
@@ -237,6 +303,7 @@ def test_ingest_command_loads_both_layers(monkeypatch):
     structure = Structure.objects.get()
     assert structure.tract == Tract.objects.get()
     assert "1 structure-tract assignments changed" in out.getvalue()
+    assert "3 zones built or redrawn" in out.getvalue()
 
 
 def test_ingest_command_rejects_malformed_bbox():

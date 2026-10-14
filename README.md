@@ -11,9 +11,12 @@ satellite imagery (Sentinel-2).
   delegated. For the MVP, a residential lot. County parcel numbers (APNs) are stored separately
   as `TractIdentifier` rows, because they change over time and a tract can have several or none.
 - **Structure**: a building, identified by its footprint, usually within one tract.
-- **Zone**: a ring around a structure (for example 0–5 ft from the footprint), computed in code.
-  Zones aren't clipped to tract boundaries, since a structure's outer rings often extend onto
-  neighboring land.
+- **Zone**: a ring around a structure at a set distance from its footprint: zone 1 is 0–5 ft,
+  zone 2 is 5–30 ft and zone 3 is 30–100 ft. The rings are defined in code (`RINGS` in
+  `core/zones.py`) and stored per structure. Zones aren't clipped to tract boundaries, since a
+  structure's outer rings often extend onto neighboring land, nor to each other, so the zones of
+  nearby structures overlap. The map shades each spot once, as the zone nearest its own structure:
+  ground 5 ft from one building and 50 ft from another shows as zone 1.
 
 ## Data
 
@@ -35,6 +38,11 @@ otherwise. `manage.py assign_structure_tracts` does the assignment and reconside
 whose own geometry, or a nearby tract's, changed since its last run; database triggers record those
 changes (`geom_updated_at`) whatever writes them. The ingest runs it when it finishes. Pass `--full`
 to reconsider everything, e.g. after changing the 90% rule.
+
+`manage.py build_zones` draws each structure's zones, redrawing only those whose footprint changed
+since its last run. The ingest runs it too. To change the rings, edit `RINGS` and bump
+`RULE_VERSION`: the next run builds every structure's zones under the new version and keeps the
+old rows, and the map serves the new ones.
 
 ## Stack
 
@@ -77,17 +85,17 @@ npm install
 npm run dev              # http://localhost:5173
 ```
 
-Lot lines appear from zoom 12 and structures from zoom 13.
+Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15.
 
 ## API
 
 | Path | Returns |
 | --- | --- |
-| `/tiles/{tracts,structures}.json` | [TileJSON](https://github.com/mapbox/tilejson-spec/tree/master/3.0.0): tile URL template, zoom range, attribution, feature properties |
-| `/tiles/{tracts,structures}/{z}/{x}/{y}.mvt` | Vector tiles; feature ids are model ids |
+| `/tiles/{tracts,structures,zones}.json` | [TileJSON](https://github.com/mapbox/tilejson-spec/tree/master/3.0.0): tile URL template, zoom range, attribution, feature properties |
+| `/tiles/{tracts,structures,zones}/{z}/{x}/{y}.mvt` | Vector tiles; feature ids are model ids. Zone tiles hold every structure's rings, overlaps included |
 | `/api/summary/` | Counts and the bounding box of loaded tracts |
 | `/api/tracts/<id>/` | County parcel numbers, acreage, structure ids |
-| `/api/structures/<id>/` | Source ID, tract, footprint square feet |
+| `/api/structures/<id>/` | Source ID, tract and its county parcel numbers, footprint square feet |
 
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
 frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`.
@@ -123,8 +131,9 @@ uv run pytest                                                         # tests (n
 ```
 src/wuixpose/
   config/   settings, URLs, ASGI/WSGI
-  core/     models (tracts, structures), migrations
+  core/     models (tracts, structures, zones), migrations
     ingest/   ArcGIS REST client, geometry cleanup, Boulder County loaders
+    zones.py  ring definitions and the job that draws them
     tiles.py  vector tiles
     api.py    JSON endpoints
 frontend/   React + MapLibre map UI

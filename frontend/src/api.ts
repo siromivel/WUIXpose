@@ -20,6 +20,7 @@ export interface StructureDetail {
   source: string | null
   source_id: string | null
   tract: number | null
+  tract_county_apns: string[]
   footprint_sq_ft: number
 }
 

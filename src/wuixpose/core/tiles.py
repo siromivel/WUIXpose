@@ -17,6 +17,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 
+from wuixpose.core import zones
 from wuixpose.core.ingest import boulder
 
 MVT_CONTENT_TYPE = "application/vnd.mapbox-vector-tile"
@@ -70,6 +71,22 @@ LAYERS = {
              WHERE s.geom && {ENVELOPE_4326}
         """,
     ),
+    "zones": TileLayer(
+        description="Zones: rings around each structure at set distances from its footprint",
+        # A 100 ft ring is only a few pixels wide below this.
+        min_zoom=15,
+        max_zoom=16,
+        fields={"structure_id": "Number", "tract_id": "Number", "ring_key": "String"},
+        # Drawn from the county's footprints.
+        attribution=boulder.ATTRIBUTION,
+        sql=f"""
+            SELECT z.id, z.structure_id, s.tract_id, z.ring_key, {MVT_GEOM.format(col="z.geom")} AS mvt_geom
+              FROM core_zone z
+              JOIN core_structure s ON s.id = z.structure_id
+             WHERE z.rule_version = %(rule_version)s
+               AND z.geom && {ENVELOPE_4326}
+        """,
+    ),
 }
 
 
@@ -92,7 +109,9 @@ def render_tile(layer_name: str, z: int, x: int, y: int) -> bytes:
          WHERE rows.mvt_geom IS NOT NULL
     """
     with connection.cursor() as cursor:
-        cursor.execute(sql, {"z": z, "x": x, "y": y, "layer": layer_name})
+        cursor.execute(
+            sql, {"z": z, "x": x, "y": y, "layer": layer_name, "rule_version": zones.RULE_VERSION}
+        )
         (tile,) = cursor.fetchone()
     return bytes(tile or b"")
 

@@ -12,6 +12,7 @@ class JobRun(models.Model):
 
     class Job(models.TextChoices):
         ASSIGN_STRUCTURE_TRACTS = "assign_structure_tracts", "Assign structures to tracts"
+        BUILD_ZONES = "build_zones", "Draw zones around structures"
 
     job = models.CharField(max_length=64, choices=Job.choices, db_collation="C")
     # Jobs set this to the database's now() (their transaction's start), the clock the

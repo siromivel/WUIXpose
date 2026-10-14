@@ -16,9 +16,14 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection, transaction
 from django.utils import timezone
 
+from wuixpose.core.ingest import rejects
 from wuixpose.core.ingest.arcgis import iter_features
-from wuixpose.core.ingest.geometry import as_multipolygon, multipolygon_from_geojson
-from wuixpose.core.models import JobRun, Structure, Tract
+from wuixpose.core.ingest.geometry import (
+    UnreadableGeometry,
+    as_multipolygon,
+    multipolygon_from_geojson,
+)
+from wuixpose.core.models import JobRun, RejectedFeature, Structure, Tract
 from wuixpose.core.models.tracts import TractIdentifier
 
 logger = logging.getLogger(__name__)
@@ -46,7 +51,7 @@ Bbox = tuple[float, float, float, float]
 class LoadResult:
     created: int = 0
     updated: int = 0
-    skipped: int = 0  # no usable ID or geometry
+    skipped: int = 0  # no usable ID or geometry; each is recorded as a RejectedFeature
 
     def __str__(self) -> str:
         return f"{self.created} created, {self.updated} updated, {self.skipped} skipped"
@@ -67,30 +72,40 @@ def fetch_footprints(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, A
     )
 
 
-def _group_by_key(features: Iterable[dict[str, Any]], key_field: str) -> tuple[dict[str, GEOSGeometry], int]:
-    """Merge features sharing an ID into one MultiPolygon per ID.
+def _group_by_key(
+    features: Iterable[dict[str, Any]], key_field: str, layer: RejectedFeature.Layer
+) -> tuple[dict[str, GEOSGeometry], list[RejectedFeature]]:
+    """Merge features sharing an ID into one MultiPolygon per ID, and reject the unusable ones.
 
     The county splits some parcels into several features (a lot cut by a road, say) that share
     one parcel number, so the ID, not the feature, is the unit.
     """
-    pieces: dict[str, list[GEOSGeometry]] = defaultdict(list)
-    skipped = 0
+    Reason = RejectedFeature.Reason
+    pieces: dict[str, list[tuple[dict[str, Any], GEOSGeometry]]] = defaultdict(list)
+    rejected = []
     for feature in features:
         key = ((feature.get("properties") or {}).get(key_field) or "").strip()
-        geom = multipolygon_from_geojson(feature.get("geometry"))
-        if not key or geom is None:
-            skipped += 1
+        if not key:
+            rejected.append(rejects.reject(layer, feature, Reason.MISSING_ID))
             continue
-        pieces[key].append(geom)
+        try:
+            geom = multipolygon_from_geojson(feature.get("geometry"))
+        except UnreadableGeometry as exc:
+            rejected.append(rejects.reject(layer, feature, Reason.UNREADABLE_GEOMETRY, source_id=key, detail=str(exc)))
+            continue
+        if geom is None:
+            rejected.append(rejects.reject(layer, feature, Reason.NOT_POLYGONAL, source_id=key))
+            continue
+        pieces[key].append((feature, geom))
 
     merged = {}
-    for key, geoms in pieces.items():
-        geom = geoms[0] if len(geoms) == 1 else as_multipolygon(geoms)
+    for key, group in pieces.items():
+        geom = group[0][1] if len(group) == 1 else as_multipolygon(g for _, g in group)
         if geom is None:
-            skipped += 1
+            rejected.extend(rejects.reject(layer, f, Reason.NOT_POLYGONAL, source_id=key) for f, _ in group)
             continue
         merged[key] = geom
-    return merged, skipped
+    return merged, rejected
 
 
 def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None) -> LoadResult:
@@ -99,10 +114,11 @@ def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None
     New identifiers are tracked from `as_of` (default: today); existing ones keep their date.
     """
     as_of = as_of or timezone.localdate()
-    by_apn, skipped = _group_by_key(features, "PARCEL_NO")
-    result = LoadResult(skipped=skipped)
+    by_apn, rejected = _group_by_key(features, "PARCEL_NO", RejectedFeature.Layer.BOCO_PARCELS)
+    result = LoadResult(skipped=len(rejected))
 
     with transaction.atomic():
+        rejects.record(rejected)
         existing = dict(
             TractIdentifier.objects.filter(
                 scheme=TractIdentifier.Scheme.COUNTY_APN,
@@ -137,11 +153,12 @@ def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None
 
 def load_structures(features: Iterable[dict[str, Any]]) -> LoadResult:
     """Upsert one structure per county StructureID."""
-    by_id, skipped = _group_by_key(features, "StructureID")
-    result = LoadResult(skipped=skipped)
+    by_id, rejected = _group_by_key(features, "StructureID", RejectedFeature.Layer.BOCO_FOOTPRINTS)
+    result = LoadResult(skipped=len(rejected))
     source = Structure.Source.BOCO_FOOTPRINTS
 
     with transaction.atomic():
+        rejects.record(rejected)
         existing = dict(
             Structure.objects.filter(source=source, source_id__in=list(by_id)).values_list("source_id", "pk")
         )

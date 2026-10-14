@@ -83,7 +83,7 @@ LAYERS = {
             SELECT z.id, z.structure_id, s.tract_id, z.ring_key, {MVT_GEOM.format(col="z.geom")} AS mvt_geom
               FROM core_zone z
               JOIN core_structure s ON s.id = z.structure_id
-             WHERE z.rule_version = {zones.RULE_VERSION}
+             WHERE z.rule_version = %(rule_version)s
                AND z.geom && {ENVELOPE_4326}
         """,
     ),
@@ -109,7 +109,9 @@ def render_tile(layer_name: str, z: int, x: int, y: int) -> bytes:
          WHERE rows.mvt_geom IS NOT NULL
     """
     with connection.cursor() as cursor:
-        cursor.execute(sql, {"z": z, "x": x, "y": y, "layer": layer_name})
+        cursor.execute(
+            sql, {"z": z, "x": x, "y": y, "layer": layer_name, "rule_version": zones.RULE_VERSION}
+        )
         (tile,) = cursor.fetchone()
     return bytes(tile or b"")
 

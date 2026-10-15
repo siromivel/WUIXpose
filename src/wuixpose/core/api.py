@@ -108,7 +108,9 @@ def tract_detail(request, pk: int):
 
 @api_view(["GET"])
 def structure_detail(request, pk: int):
-    structure = get_object_or_404(Structure.objects.prefetch_related("tract__identifiers"), pk=pk)
+    structure = get_object_or_404(
+        Structure.objects.select_related("tract").prefetch_related("tract__identifiers"), pk=pk
+    )
     return Response(StructureSerializer(structure).data)
 
 

@@ -48,6 +48,10 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Never drop tables or run destructive SQL without asking first.
 - `geom_updated_at` columns are maintained by database triggers (migration 0003). Never set
   them from Python; jobs rely on the triggers to find changed geometry.
+- `Address.search_text` is derived by `address_search_text` in `core/search.py`. Never write it
+  by hand. To change normalization, change `WORDS`/`UNIT_WORDS` together with the cases in
+  `test_search.py`, which are its spec. No migration is needed: the ingest rewrites any stored
+  text that differs.
 
 ## Geospatial (PostGIS / GeoDjango)
 - Geometries are stored in SRID 4326 as (lon, lat), not (lat, lon). Use the `STORAGE_SRID`
@@ -77,7 +81,8 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Type hints on all function signatures; avoid `Any` unless unavoidable.
 - Business logic goes in plain service functions, not in views, model methods or management
   commands. Commands stay thin wrappers (see `build_zones`).
-- Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `ingest/`.
+- Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `search.py`,
+  `ingest/`.
   Add a new module for a new feature rather than growing an unrelated one.
 - Use the ORM. Raw SQL only when GeoDjango can't express a PostGIS query,
   and always parameterized, never string-formatted.
@@ -95,4 +100,8 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Build-time settings come from `VITE_*` variables, with defaults in `frontend/src/config.ts`.
 
 ## Gotchas
+- The `django-types` stubs lag Django; `TrigramWordSimilarity`, for one, is missing. Use a
+  targeted `# pyright: ignore[<rule>]` with a comment saying why, rather than loosening pyright.
+- An editor's Pyright may not use `.venv` and report Django imports as unresolved. Trust
+  `mise run typecheck`.
 <!-- Add entries here as agents trip over things. -->

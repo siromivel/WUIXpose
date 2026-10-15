@@ -24,13 +24,15 @@ database when they need it.
 - Database only: `mise run db`; migrations: `mise run migrate`
 - Dev servers: `mise run dev` (Django, :8000) and `mise run dev-frontend` (map UI, :5173)
 - Before every commit: `mise run check` (everything CI runs)
-- Individual checks: `mise run lint`, `typecheck`, `migrations-check`, `test`, `frontend-check`
+- Individual checks: `mise run lint`, `typecheck`, `migrations-check`, `test`, `frontend-check`,
+  `frontend-test`
 - CI runs these same tasks. To add a check, add a mise task and call it from
   `.github/workflows/ci.yaml`; don't inline commands in the workflow.
 
 One-off commands:
 - `manage.py` lives in `src/wuixpose`, so run `uv run python manage.py <command>` from there.
 - Run `uv run pytest -k <pattern>` from the repo root for a subset of tests.
+- Run `npm test -- <file filter>` from `frontend/` for a subset of the frontend tests.
 - Load a small area of map data rather than the whole county:
   `uv run python manage.py ingest_boulder --bbox=-105.45,40.03,-105.30,40.09`
 
@@ -103,6 +105,9 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
   (`Checked<typeof ...>`). Change a response's shape there, never with a separate interface or an
   `as` cast. Keep it in step with the serializers in `core/api.py`.
 - Build-time settings come from `VITE_*` variables, with defaults in `frontend/src/config.ts`.
+- Tests use Vitest, in a `*.test.ts` file next to the module they cover. Stub `fetch` rather than
+  calling a server (see `api.test.ts`). Test files are type-checked with the app, so
+  `expectTypeOf` assertions fail `frontend-check`, not `frontend-test`.
 
 ## Gotchas
 - The `django-types` stubs lag Django; `TrigramWordSimilarity`, for one, is missing. Use a

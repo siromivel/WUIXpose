@@ -63,6 +63,11 @@ run = [
   "npm run build",  # tsc -b, then vite build
 ]
 
+[tasks.frontend-test]
+description = "Run the frontend tests"
+dir = "{{config_root}}/frontend"
+run = "npm test"
+
 [tasks.check]
 description = "Everything CI runs"
-depends = ["lint", "typecheck", "migrations-check", "test", "frontend-check"]
+depends = ["lint", "typecheck", "migrations-check", "test", "frontend-check", "frontend-test"]

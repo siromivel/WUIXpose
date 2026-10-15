@@ -76,3 +76,6 @@ jobs:
 
       - name: Lint, type-check and bundle
         run: mise run frontend-check
+
+      - name: Test
+        run: mise run frontend-test

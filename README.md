@@ -184,6 +184,7 @@ mise run typecheck         # Python types (pyright)
 mise run migrations-check  # migrations match models (starts the database)
 mise run test              # Python tests (starts the database)
 mise run frontend-check    # frontend lint, types and bundle
+mise run frontend-test     # frontend tests (Vitest)
 ```
 
 ## Layout

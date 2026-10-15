@@ -36,20 +36,26 @@ jobs:
       POSTGRES_PORT: "5432"
       # Settings refuse to load without a key when DEBUG is off, which it is here.
       DJANGO_SECRET_KEY: ci-only-not-secret
+      # Use the Python that mise installs from mise.toml; fail rather than let uv download another.
+      UV_PYTHON_DOWNLOADS: never
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # GeoDjango loads the GDAL and GEOS C libraries even just to import, and the
       # runner image doesn't include them.
       - name: Install GDAL and GEOS
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends gdal-bin
 
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: python
+
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
-      # Installs the Python version from .python-version and fails if uv.lock is out of date.
+      # Builds the venv on mise's Python (matching .python-version) and fails if uv.lock is out of date.
       - name: Install dependencies
         run: uv sync --locked
 
@@ -76,11 +82,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
+      - uses: jdx/mise-action@v5
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          install_args: node
+
+      # mise doesn't cache npm's download cache the way setup-node did.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci

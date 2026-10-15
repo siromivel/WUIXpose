@@ -98,7 +98,10 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - No `any`; use `unknown` and narrow.
 - ES modules, `const` by default, `async`/`await` over raw promise chains.
 - Prefer named exports (Vite's `App.tsx` and config files are the exceptions).
-- Validate external data (API responses, user input) at the boundary.
+- Validate external data (API responses, user input) at the boundary. API responses go through
+  the checks in `api.ts`, built from `validate.ts`, and their types are derived from those checks
+  (`Checked<typeof ...>`). Change a response's shape there, never with a separate interface or an
+  `as` cast. Keep it in step with the serializers in `core/api.py`.
 - Build-time settings come from `VITE_*` variables, with defaults in `frontend/src/config.ts`.
 
 ## Gotchas

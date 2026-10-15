@@ -153,6 +153,10 @@ the panel finds an address, flies the map there and selects its lot.
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
 frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`.
 
+The frontend checks every response against its expected shape before using it (`frontend/src/api.ts`,
+built from the checks in `frontend/src/validate.ts`). A response that doesn't match fails with a
+message naming the field, rather than breaking somewhere later in the UI.
+
 ## Configuration
 
 Settings come from environment variables, with `.env` at the repo root filling in any that

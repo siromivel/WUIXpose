@@ -29,7 +29,10 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--bbox",
-            help="Only load features intersecting min_lon,min_lat,max_lon,max_lat (WGS 84).",
+            help=(
+                "Only load features intersecting min_lon,min_lat,max_lon,max_lat (WGS 84). Addresses "
+                "missing from the county layer are only retired by runs without one."
+            ),
         )
         parser.add_argument("--page-size", type=int, default=2000)
 
@@ -48,7 +51,10 @@ class Command(BaseCommand):
                 self.stdout.write(f"  structures: {result}")
             if "addresses" in layers:
                 self.stdout.write("Loading address points as addresses...")
-                result = boulder.load_addresses(boulder.fetch_addresses(box, page_size=page_size))
+                # Only a countywide load can tell that an address is gone; a bbox one sees just
+                # what's inside the box.
+                features = boulder.fetch_addresses(box, page_size=page_size)
+                result = boulder.load_addresses(features, complete=box is None)
                 self.stdout.write(f"  addresses: {result}")
         except ArcGISError as exc:
             raise CommandError(f"Boulder County GIS request failed: {exc}") from exc

@@ -1,7 +1,8 @@
 import re
 
 from django.contrib.gis.db import models
-from django.db.models import Q
+from django.db.models import F, Q
+from django.utils import timezone
 
 from .tracts import STORAGE_SRID
 
@@ -31,11 +32,19 @@ def _display_case(text: str) -> str:
     return " ".join(words)
 
 
+class AddressQuerySet(models.QuerySet):
+    def current(self):
+        return self.filter(tracked_to__isnull=True)
+
+
 class Address(models.Model):
     """A site address: a point a street address is assigned to, as an addressing authority keeps it.
 
     Text is stored as the source publishes it (Boulder County: upper case, unabbreviated city
     names); display_* methods format it.
+
+    Retired addresses are kept, with tracked_to set and their details as last published while
+    active, so history can refer to them. Most queries want Address.objects.current().
     """
 
     class Source(models.TextChoices):
@@ -68,6 +77,13 @@ class Address(models.Model):
         related_name="addresses",
     )
 
+    # WUIXpose's own dates, as on TractIdentifier: from the day we first loaded the address until
+    # the day an ingest found it retired or gone. Cleared if it comes back; tracked_from stays.
+    tracked_from = models.DateField(default=timezone.localdate)
+    tracked_to = models.DateField(null=True, blank=True)  # null = current
+
+    objects = AddressQuerySet.as_manager()
+
     class Meta:
         constraints = (
             models.UniqueConstraint(fields=("source", "source_id"), name="uniq_address_source_id"),
@@ -79,6 +95,10 @@ class Address(models.Model):
             models.CheckConstraint(
                 condition=Q(county_apn__isnull=True) | Q(county_fips__regex=r"^\d{5}$"),
                 name="address_apn_has_county",
+            ),
+            models.CheckConstraint(
+                condition=Q(tracked_to__isnull=True) | Q(tracked_to__gte=F("tracked_from")),
+                name="address_tracked_range",
             ),
         )
 

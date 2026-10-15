@@ -57,6 +57,12 @@ parcels under a point leave it without one. The parcel number comes first becaus
 points can sit on a neighbor's lot at the driveway. Every ingest relinks all addresses (about a
 second for the whole county). Addresses aren't linked to structures yet.
 
+Retired addresses are kept, with `tracked_to` set to the day an ingest found them retired, and left
+out of the API. The county marks some `RETIRED` but deletes most outright, so a countywide ingest
+(no `--bbox`) also retires every address missing from the layer. That fetch is checked against the
+server's count first, so a short response fails the ingest rather than retiring what it missed. An
+address that reappears is current again. Retired addresses keep their last details and tract.
+
 Addresses carry the county's jurisdiction ("Unincorporated Boulder County", "Longmont"), not the
 USPS mailing city, which the county layer doesn't publish: a Gold Hill address shows as
 unincorporated though its mail goes to Boulder.

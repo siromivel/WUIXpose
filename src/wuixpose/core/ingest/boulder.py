@@ -57,9 +57,13 @@ class LoadResult:
     created: int = 0
     updated: int = 0
     skipped: int = 0  # no usable ID or geometry; each is recorded as a RejectedFeature
+    retired: int | None = None  # None for layers whose loads don't retire anything
+    unchanged: int | None = None  # None for layers whose loads rewrite every existing row
 
     def __str__(self) -> str:
-        return f"{self.created} created, {self.updated} updated, {self.skipped} skipped"
+        unchanged = "" if self.unchanged is None else f", {self.unchanged} unchanged"
+        retired = "" if self.retired is None else f", {self.retired} retired"
+        return f"{self.created} created, {self.updated} updated{unchanged}{retired}, {self.skipped} skipped"
 
 
 def fetch_parcels(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, Any]]:
@@ -82,13 +86,16 @@ STREET_FIELDS = ("PREFIX", "PREMODIFIER", "PRETYPE", "STREETNAME", "STREETTYPE",
 
 
 def fetch_addresses(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, Any]]:
-    # Retired and proposed addresses stay in the county layer with other statuses.
+    """Active and retired address points. Count-checked, so a load can retire what's missing."""
+    # Retired addresses either stay in the county layer as RETIRED or are removed from it. Other
+    # statuses (POTENTIAL, null) aren't addresses we load.
     return iter_features(
         ADDRESSES_URL,
-        where="STATUS = 'ACTIVE'",
+        where="STATUS IN ('ACTIVE', 'RETIRED')",
         out_fields=(
             "OBJECTID",
             "ADDRESS_ID",
+            "STATUS",
             "STREET_NUMBER",
             "STREET_NUMBER_SUFFIX",
             *STREET_FIELDS,
@@ -99,6 +106,7 @@ def fetch_addresses(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, An
             "PARCEL_NUMBER",
         ),
         bbox=bbox,
+        check_count=True,
         **kwargs,
     )
 
@@ -240,33 +248,96 @@ def _address_fields(props: dict[str, Any]) -> dict[str, Any] | None:
 ADDRESS_FIELDS = ("geom", "number", "street", "unit", "jurisdiction", "state", "zip_code", "county_fips", "county_apn")
 
 
-def load_addresses(features: Iterable[dict[str, Any]]) -> LoadResult:
-    """Upsert one address per county ADDRESS_ID. Run link_address_tracts afterwards."""
+def _matches(address: Address, fields: dict[str, Any]) -> bool:
+    """Whether a stored address already has these field values. Points must match exactly."""
+    return all(
+        address.geom.equals_exact(value) if name == "geom" else getattr(address, name) == value
+        for name, value in fields.items()
+    )
+
+
+def load_addresses(
+    features: Iterable[dict[str, Any]], *, as_of: date | None = None, complete: bool = False
+) -> LoadResult:
+    """Upsert one address per county ADDRESS_ID and retire those the county has retired.
+
+    An address is retired (tracked_to set to `as_of`, default today) when its feature says
+    RETIRED, or, with `complete`, when no active feature has its ID. Pass `complete` only for
+    features that are the whole layer, count-checked (fetch_addresses with no bbox): every current
+    address missing from them is retired. An active feature that's rejected still counts as
+    present, since the county still has the address. A retired address keeps its last active
+    details; one that turns up active again is current again, keeping its tracked_from.
+
+    New addresses are tracked from `as_of`. Run link_address_tracts afterwards.
+    """
+    as_of = as_of or timezone.localdate()
+    layer = RejectedFeature.Layer.BOCO_ADDRESS_POINTS
+    Reason = RejectedFeature.Reason
     by_id: dict[str, dict[str, Any]] = {}
-    skipped = 0
+    present: set[str] = set()  # IDs of every active feature, loaded or rejected
+    retired: set[str] = set()  # IDs the county marks RETIRED
+    rejected = []
     for feature in features:
         props = feature.get("properties") or {}
         address_id = _text(props, "ADDRESS_ID")
-        geom = point_from_geojson(feature.get("geometry"))
+        if _text(props, "STATUS") == "RETIRED":
+            # Only the ID matters: the address keeps its details from while it was active.
+            if address_id:
+                retired.add(address_id)
+            continue
+        if not address_id:
+            rejected.append(rejects.reject(layer, feature, Reason.MISSING_ID))
+            continue
+        present.add(address_id)
+        try:
+            geom = point_from_geojson(feature.get("geometry"))
+        except UnreadableGeometry as exc:
+            rejected.append(rejects.reject(layer, feature, Reason.UNREADABLE_GEOMETRY, source_id=address_id, detail=str(exc)))
+            continue
+        if geom is None:
+            rejected.append(rejects.reject(layer, feature, Reason.NOT_A_POINT, source_id=address_id))
+            continue
         fields = _address_fields(props)
-        if not address_id or geom is None or fields is None:
-            skipped += 1
+        if fields is None:
+            rejected.append(rejects.reject(layer, feature, Reason.NO_STREET_ADDRESS, source_id=address_id))
             continue
         by_id[address_id] = fields | {"geom": geom}
-    result = LoadResult(skipped=skipped)
+    result = LoadResult(skipped=len(rejected))
     source = Address.Source.BOCO_ADDRESS_POINTS
 
     with transaction.atomic():
-        existing = dict(Address.objects.filter(source=source, source_id__in=list(by_id)).values_list("source_id", "pk"))
-        to_update = [Address(pk=pk, **by_id[aid]) for aid, pk in existing.items()]
-        Address.objects.bulk_update(to_update, ADDRESS_FIELDS, batch_size=BATCH_SIZE)
+        rejects.record(rejected)
+        ours = Address.objects.filter(source=source)
+        existing = {
+            a.source_id: a
+            for a in ours.filter(source_id__in=list(by_id)).only("source_id", "tracked_to", *ADDRESS_FIELDS)
+        }
+        # Rewriting every row is most of a countywide load's time, and few change between runs.
+        to_update = []
+        for aid, address in existing.items():
+            fields = by_id[aid]
+            if address.tracked_to is None and _matches(address, fields):
+                continue
+            for name, value in fields.items():
+                setattr(address, name, value)
+            address.tracked_to = None
+            to_update.append(address)
+        Address.objects.bulk_update(to_update, [*ADDRESS_FIELDS, "tracked_to"], batch_size=BATCH_SIZE)
         result.updated = len(to_update)
+        result.unchanged = len(existing) - len(to_update)
 
         created = Address.objects.bulk_create(
-            [Address(source=source, source_id=aid, **fields) for aid, fields in by_id.items() if aid not in existing],
+            [
+                Address(source=source, source_id=aid, tracked_from=as_of, **fields)
+                for aid, fields in by_id.items()
+                if aid not in existing
+            ],
             batch_size=BATCH_SIZE,
         )
         result.created = len(created)
+
+        gone = ours.current().exclude(source_id__in=present) if complete else ours.current().filter(source_id__in=retired)
+        result.retired = gone.update(tracked_to=as_of)
     return result
 
 
@@ -283,6 +354,7 @@ _LINK_ADDRESSES = """
                    (SELECT min(t.id) FROM core_tract t WHERE ST_Intersects(t.geom, a.geom) HAVING count(*) = 1)
                ) AS tract_id
           FROM core_address a
+         WHERE a.tracked_to IS NULL
     )
     UPDATE core_address a
        SET tract_id = best.tract_id
@@ -293,15 +365,16 @@ _LINK_ADDRESSES = """
 
 
 def link_address_tracts() -> int:
-    """Set every address's tract, returning how many changed.
+    """Set every current address's tract, returning how many changed.
 
     An address belongs to the tract currently carrying its county parcel number. Failing that (the
     county replatted and the address still has the old number, or there's no number), it belongs
     to the one tract under its point, if there's exactly one. The point alone isn't trusted first:
     rural address points can sit at a driveway entrance on a neighbor's lot.
 
-    Reconsiders every address. Unlike structure assignment this is cheap enough to run in full
-    after every ingest, so it needs no change tracking.
+    Reconsiders every current address. Unlike structure assignment this is cheap enough to run in
+    full after every ingest, so it needs no change tracking. Retired addresses keep the tract they
+    last had.
     """
     with transaction.atomic(), connection.cursor() as cursor:
         cursor.execute(_LINK_ADDRESSES)

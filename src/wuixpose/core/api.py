@@ -53,7 +53,7 @@ def _address_order(address: Address) -> tuple:
 def tract_addresses(tract_id: int | None) -> list[dict]:
     if tract_id is None:
         return []
-    addresses = sorted(Address.objects.filter(tract_id=tract_id), key=_address_order)
+    addresses = sorted(Address.objects.current().filter(tract_id=tract_id), key=_address_order)
     return AddressSerializer(addresses, many=True).data
 
 
@@ -120,7 +120,7 @@ def summary(request):
         {
             "tract_count": Tract.objects.count(),
             "structure_count": Structure.objects.count(),
-            "address_count": Address.objects.count(),
+            "address_count": Address.objects.current().count(),
             "bbox": list(extent) if extent else None,  # [min_lon, min_lat, max_lon, max_lat]
         }
     )

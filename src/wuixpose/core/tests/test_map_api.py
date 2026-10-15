@@ -228,6 +228,20 @@ def test_summary_reports_extent_of_tracts(client, loaded):
 
 
 @pytest.mark.django_db
+def test_retired_addresses_are_left_out(client, loaded):
+    boulder.load_addresses(
+        [point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STATUS="RETIRED"), 0.0003, 0.0003)]
+    )
+
+    tract = client.get(reverse("tract-detail", args=[loaded["tract"].pk])).json()
+    summary = client.get(reverse("summary")).json()
+
+    assert "9 Gold Run Rd" not in [a["line1"] for a in tract["addresses"]]
+    assert len(tract["addresses"]) == 3
+    assert summary["address_count"] == 3
+
+
+@pytest.mark.django_db
 def test_summary_with_no_data(client):
     assert client.get(reverse("summary")).json() == {
         "tract_count": 0,

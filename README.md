@@ -69,27 +69,30 @@ unincorporated though its mail goes to Boulder.
 
 ## Stack
 
-Python 3.13, Django 5.2 with GeoDjango, Django REST Framework, PostgreSQL 17 + PostGIS, Redis,
-managed with [uv](https://docs.astral.sh/uv/). The map UI is React + TypeScript with
-[MapLibre GL JS](https://maplibre.org/), built with Vite. Map shapes reach the browser as vector
-tiles that PostGIS builds (`ST_AsMVT`) and Django serves.
+Python, Django 5.2 with GeoDjango, Django REST Framework, PostgreSQL 17 + PostGIS and Redis,
+with dependencies managed by [uv](https://docs.astral.sh/uv/). The map UI is React + TypeScript
+with [MapLibre GL JS](https://maplibre.org/), built with Vite. Map shapes reach the browser as
+vector tiles that PostGIS builds (`ST_AsMVT`) and Django serves. [mise](https://mise.jdx.dev/)
+pins the Python and Node versions (`mise.toml`) and defines the project's tasks.
 
 ## Local development
 
-Prerequisites: uv, Node 22, Docker, and the GDAL/GEOS libraries that GeoDjango loads
-(`brew install gdal` on macOS, `apt install gdal-bin` on Debian/Ubuntu).
+Prerequisites: mise, uv, Docker and the GDAL/GEOS libraries that GeoDjango loads
+(`brew install gdal` on macOS, `apt install gdal-bin` on Debian/Ubuntu). mise installs Python and
+Node.
 
 ```bash
 cp .env.example .env     # local settings: DEBUG on, defaults matching compose.yaml
-docker compose up -d     # Postgres/PostGIS on :5432, Redis on :6379
-uv sync                  # create .venv and install dependencies
-
-cd src/wuixpose
-uv run python manage.py migrate
-uv run python manage.py runserver
+mise install             # Python and Node, at the versions in mise.toml
+mise run setup           # Python and frontend dependencies
+mise run migrate         # starts Postgres/PostGIS (:5432) and Redis (:6379), then migrates
+mise run dev             # Django on :8000
 ```
 
 Check that it's up: `curl localhost:8000/health/` should return `{"status": "ok"}`.
+
+`mise tasks` lists every task. Tasks that need the database (`dev`, `migrate`, `test`) start it
+first; `mise run db` starts it on its own.
 
 Load map data (in another terminal, from `src/wuixpose`). The whole county takes a while; a bounding box (WGS 84
 `min_lon,min_lat,max_lon,max_lat`) loads one area, for example around Gold Hill and Sunshine
@@ -103,9 +106,7 @@ uv run python manage.py ingest_boulder        # everything
 Then start the map UI, which proxies `/api` and `/tiles` to Django on :8000:
 
 ```bash
-cd frontend
-npm install
-npm run dev              # http://localhost:5173
+mise run dev-frontend    # http://localhost:5173
 ```
 
 Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15.
@@ -140,13 +141,15 @@ defaults.
 
 ## Checks
 
-Run these from the repo root. CI runs the same ones on every push to `main` and every pull request.
+`mise run check` runs everything CI runs on every push to `main` and every pull request. Each
+check is also its own task:
 
 ```bash
-uv run ruff check                                                     # lint
-uv run pytest                                                         # tests (needs the database)
-(cd src/wuixpose && uv run python manage.py makemigrations --check --dry-run)  # migrations match models
-(cd frontend && npm run lint && npm run build)                        # frontend lint, types, bundle
+mise run lint              # Python lint (ruff)
+mise run typecheck         # Python types (pyright)
+mise run migrations-check  # migrations match models
+mise run test              # Python tests (starts the database)
+mise run frontend-check    # frontend lint, types and bundle
 ```
 
 ## Layout

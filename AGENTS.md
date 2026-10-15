@@ -1,32 +1,36 @@
 # WUIXpose
 
-Wildfire-risk exposure tool for WUI properties. Django (Python) backend,
-Node [frontend/tooling], Postgres + PostGIS. Favor boring, simple solutions;
-don't add dependencies or abstractions without asking.
+Wildfire mitigation insight for homes in the wildland-urban interface. Django + GeoDjango backend
+on Postgres/PostGIS, with a React + TypeScript + MapLibre map UI in `frontend/` built with Vite.
+Favor boring, simple solutions; don't add dependencies or abstractions without asking.
 
-<!-- Human note: task names below assume mise.toml defines dev, test, lint and setup.
-     Adjust to match. HTML comments like this are stripped before agents see them. -->
+`README.md` is the source of truth for the domain model and data rules. When you change how
+something behaves, update the README in the same change.
 
 ## Tooling
-- mise manages tool versions (Python, uv, Node) and env vars via `mise.toml`.
+- mise pins the Python and Node versions (`mise.toml`) and defines the project's tasks.
   Don't install tools globally or change versions directly; update `mise.toml`.
 - uv manages Python dependencies and the virtualenv.
   - Add packages with `uv add <pkg>` (or `uv add --dev <pkg>`). Never use `pip install`.
   - Never edit `uv.lock` by hand.
-- Node dependencies: [`npm install <pkg>`]. Never edit the lockfile by hand.
-- Env vars (e.g. `DATABASE_URL`) come from mise. Never hardcode them.
+- npm manages frontend dependencies, from `frontend/`. Never edit `package-lock.json` by hand.
+- Settings come from environment variables, with `.env` at the repo root filling in any that
+  aren't set (django-environ). `.env.example` lists them all. Never hardcode settings or secrets.
 
 ## Commands
-Prefer mise tasks for project workflows:
+Use mise tasks (`mise tasks` lists them). They run from the right directory and start the
+database when they need it.
 - Setup: `mise install`, then `mise run setup`
-- Dev server: `mise run dev`
-- Tests: `mise run test` (run before every commit)
-- Lint/format: `mise run lint`
+- Database only: `mise run db`; migrations: `mise run migrate`
+- Dev servers: `mise run dev` (Django, :8000) and `mise run dev-frontend` (map UI, :5173)
+- Before every commit: `mise run check` (everything CI runs)
+- Individual checks: `mise run lint`, `typecheck`, `migrations-check`, `test`, `frontend-check`
 
-For one-off Python commands, use `uv run`:
-- `uv run python manage.py <command>`
-- `uv run pytest -k <pattern>` to run a subset of tests
-- `uv run python --version` to check the environment
+One-off commands:
+- `manage.py` lives in `src/wuixpose`, so run `uv run python manage.py <command>` from there.
+- Run `uv run pytest -k <pattern>` from the repo root for a subset of tests.
+- Load a small area of map data rather than the whole county:
+  `uv run python manage.py ingest_boulder --bbox=-105.45,40.03,-105.30,40.09`
 
 If a tool isn't on PATH, use `mise exec -- <command>`.
 
@@ -37,17 +41,27 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
   scripts or inline shell tricks.
 
 ## Database
-- Local dev DB only. Never connect to or run commands against any non-local database.
+- Local dev DB only (from `compose.yaml`). Never connect to or run commands against any
+  non-local database.
 - Never edit a migration that has already been applied; add a new one.
-- `uv run python manage.py makemigrations --check` must pass before committing.
+- `mise run migrations-check` must pass before committing.
 - Never drop tables or run destructive SQL without asking first.
+- `geom_updated_at` columns are maintained by database triggers (migration 0003). Never set
+  them from Python; jobs rely on the triggers to find changed geometry.
 
 ## Geospatial (PostGIS / GeoDjango)
-- Store geometries in EPSG:4326. Coordinates are (lon, lat), not (lat, lon).
-- For distance, area or buffers, use geography types or transform to a projected
-  CRS (EPSG:32613, UTM 13N, for Colorado). Never measure in degrees.
-- Use `ST_DWithin` (index-friendly) for proximity filters, not `ST_Distance < x`.
-- Every geometry column used in spatial queries needs a GiST index.
+- Geometries are stored in SRID 4326 as (lon, lat), not (lat, lon). Use the `STORAGE_SRID`
+  constant from `core/models/tracts.py`; don't hardcode 4326.
+- Never buffer or measure directly on stored geometries; their units are degrees.
+  - Distances and buffers: cast to `geography`, which works in meters (as `core/zones.py` does).
+  - Areas: transform to equal-area EPSG:5070 (as `core/api.py` does).
+  - Tests can verify distances in UTM 13N (EPSG:32613), as `test_zones.py` does.
+- Keep spatial filters index-friendly: `ST_DWithin` rather than `ST_Distance < x`, and transform
+  the query shape (e.g. a tile envelope) to 4326 rather than transforming every row
+  (as `core/tiles.py` does).
+- Zone rings live in `RINGS` in `core/zones.py`. Changing them means bumping `RULE_VERSION`.
+- Tile layers are defined in `LAYERS` in `core/tiles.py`. The frontend reads each layer's
+  TileJSON; never hardcode tile URLs or zoom ranges in the frontend.
 
 ## Conventions
 
@@ -59,25 +73,26 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Small, focused commits with descriptive messages.
 
 ### Python / Django
-- Follow PEP 8 naming. Formatting and linting come from `mise run lint`; don't hand-format.
+- Follow PEP 8 naming. Ruff lints (`mise run lint`); pyright checks types (`mise run typecheck`).
 - Type hints on all function signatures; avoid `Any` unless unavoidable.
-- Keep views and models thin. Business logic goes in plain service functions,
-  not in views or model methods.
-- Service functions live in each app's `services/` package: one module per model
-  for entity logic (`services/tracts.py`), plus use-case modules for workflows
-  spanning several models (`services/exposure_assessment.py`).
+- Business logic goes in plain service functions, not in views, model methods or management
+  commands. Commands stay thin wrappers (see `build_zones`).
+- Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `ingest/`.
+  Add a new module for a new feature rather than growing an unrelated one.
 - Use the ORM. Raw SQL only when GeoDjango can't express a PostGIS query,
   and always parameterized, never string-formatted.
 - Avoid N+1 queries: use `select_related` / `prefetch_related` when iterating relations.
-- Datetimes are timezone-aware (`USE_TZ = True`); use `django.utils.timezone.now()`.
-- Settings come from env vars, never hardcoded per environment.
-- Tests use pytest; prefer small, fast unit tests over broad end-to-end ones.
+- Datetimes are timezone-aware; use `django.utils.timezone.now()`.
+- Tests use pytest with pytest-django; build data with `core/tests/factories.py`.
+  Prefer small, fast tests over broad end-to-end ones.
 
-### Node / TypeScript
-- TypeScript in strict mode. No `any`; use `unknown` and narrow.
+### Frontend (TypeScript / React)
+- TypeScript runs in strict mode. Don't loosen compiler options to get past an error; fix the types.
+- No `any`; use `unknown` and narrow.
 - ES modules, `const` by default, `async`/`await` over raw promise chains.
-- Prefer named exports over default exports.
+- Prefer named exports (Vite's `App.tsx` and config files are the exceptions).
 - Validate external data (API responses, user input) at the boundary.
+- Build-time settings come from `VITE_*` variables, with defaults in `frontend/src/config.ts`.
 
 ## Gotchas
 <!-- Add entries here as agents trip over things. -->

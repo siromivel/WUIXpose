@@ -1,3 +1,47 @@
 [tools]
 node = "24"
 python = "3.15.0"
+
+# Mirrors the README's local dev steps and CI's checks.
+# Run `mise tasks` to list them.
+
+[tasks.setup]
+description = "Install Python and frontend dependencies"
+run = [
+  "uv sync",
+  "npm --prefix frontend ci",
+]
+
+[tasks.db]
+description = "Start Postgres/PostGIS and Redis"
+run = "docker compose up -d"
+
+[tasks.migrate]
+description = "Apply database migrations"
+dir = "{{config_root}}/src/wuixpose"
+depends = ["db"]
+run = "uv run python manage.py migrate"
+
+[tasks.dev]
+description = "Run the Django dev server on :8000"
+dir = "{{config_root}}/src/wuixpose"
+depends = ["db"]
+run = "uv run python manage.py runserver"
+
+[tasks.dev-frontend]
+description = "Run the map UI on :5173 (proxies /api and /tiles to :8000)"
+dir = "{{config_root}}/frontend"
+run = "npm run dev"
+
+[tasks.lint]
+description = "Lint Python"
+run = "uv run ruff check"
+
+[tasks.typecheck]
+description = "Type-check Python"
+run = "uv run pyright"
+
+[tasks.migrations-check]
+description = "Fail if models and migrations are out of sync"
+dir = "{{config_root}}/src/wuixpose"
+run = "uv run python manage.py makemigrations --check --dry-run"

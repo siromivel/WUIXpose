@@ -118,8 +118,8 @@ mise run dev             # Django on :8000
 
 Check that it's up: `curl localhost:8000/health/` should return `{"status": "ok"}`.
 
-`mise tasks` lists every task. Tasks that need the database (`dev`, `migrate`, `test`) start it
-first; `mise run db` starts it on its own.
+`mise tasks` lists every task. Tasks that need the database (`dev`, `migrate`, `migrations-check`,
+`test`) start it first and wait until it's healthy; `mise run db` starts it on its own.
 
 Load map data (in another terminal, from `src/wuixpose`). The whole county takes a while; a bounding box (WGS 84
 `min_lon,min_lat,max_lon,max_lat`) loads one area, for example around Gold Hill and Sunshine
@@ -171,12 +171,13 @@ defaults.
 ## Checks
 
 `mise run check` runs everything CI runs on every push to `main` and every pull request. Each
-check is also its own task:
+check is also its own task, and CI runs these same tasks, starting the database from
+`compose.yaml` as local development does:
 
 ```bash
 mise run lint              # Python lint (ruff)
 mise run typecheck         # Python types (pyright)
-mise run migrations-check  # migrations match models
+mise run migrations-check  # migrations match models (starts the database)
 mise run test              # Python tests (starts the database)
 mise run frontend-check    # frontend lint, types and bundle
 ```

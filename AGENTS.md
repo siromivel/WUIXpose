@@ -25,6 +25,8 @@ database when they need it.
 - Dev servers: `mise run dev` (Django, :8000) and `mise run dev-frontend` (map UI, :5173)
 - Before every commit: `mise run check` (everything CI runs)
 - Individual checks: `mise run lint`, `typecheck`, `migrations-check`, `test`, `frontend-check`
+- CI runs these same tasks. To add a check, add a mise task and call it from
+  `.github/workflows/ci.yaml`; don't inline commands in the workflow.
 
 One-off commands:
 - `manage.py` lives in `src/wuixpose`, so run `uv run python manage.py <command>` from there.

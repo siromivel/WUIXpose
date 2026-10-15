@@ -97,6 +97,11 @@ DATABASES = {
     }
 }
 
+# GeoDjango finds GDAL and GEOS on its own on Linux and with Homebrew's Python, but not with
+# standalone Python builds (mise, uv) on macOS, which don't search /opt/homebrew/lib.
+GDAL_LIBRARY_PATH = env.str("GDAL_LIBRARY_PATH", default="") or None
+GEOS_LIBRARY_PATH = env.str("GEOS_LIBRARY_PATH", default="") or None
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",

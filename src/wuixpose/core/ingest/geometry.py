@@ -3,7 +3,14 @@ from collections.abc import Iterable
 from typing import Any
 
 from django.contrib.gis.gdal import GDALException, OGRGeometry
-from django.contrib.gis.geos import GEOSException, GEOSGeometry, MultiPolygon, Polygon
+from django.contrib.gis.geos import (
+    GEOSException,
+    GEOSGeometry,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 
 from wuixpose.core.models.tracts import STORAGE_SRID
 
@@ -28,6 +35,28 @@ def multipolygon_from_geojson(geometry: dict[str, Any] | None) -> MultiPolygon |
         return as_multipolygon([ogr.geos])
     except (GDALException, GEOSException, ValueError) as exc:
         raise UnreadableGeometry(f"{type(exc).__name__}: {exc}") from exc
+
+
+def point_from_geojson(geometry: dict[str, Any] | None) -> Point | None:
+    """Parse a GeoJSON Point (or a MultiPoint of one) into a 2D Point, or None if there isn't one.
+
+    Raises UnreadableGeometry for GeoJSON that can't be built into a geometry, as
+    multipolygon_from_geojson does.
+    """
+    if not geometry:
+        return None
+    try:
+        ogr = OGRGeometry(json.dumps(geometry), srs=STORAGE_SRID)
+        ogr.set_3d(False)
+        ogr.set_measured(False)
+        geom = ogr.geos
+    except (GDALException, GEOSException, ValueError) as exc:
+        raise UnreadableGeometry(f"{type(exc).__name__}: {exc}") from exc
+    if isinstance(geom, MultiPoint) and len(geom) == 1:
+        geom = geom[0]
+    if not isinstance(geom, Point) or geom.empty:
+        return None
+    return geom
 
 
 def as_multipolygon(geoms: Iterable[GEOSGeometry]) -> MultiPolygon | None:

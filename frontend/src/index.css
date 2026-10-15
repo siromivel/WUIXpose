@@ -103,7 +103,7 @@ code {
 
 .stats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin: 0;
 }
@@ -178,6 +178,35 @@ code {
 .card dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.addresses {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.addresses li + li {
+  margin-top: 4px;
+}
+
+.addresses .line2 {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.addresses .muted,
+p.address {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+p.address {
+  margin-bottom: 12px;
 }
 
 .card .id {

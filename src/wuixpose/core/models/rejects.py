@@ -13,11 +13,14 @@ class RejectedFeature(models.Model):
     class Layer(models.TextChoices):
         BOCO_PARCELS = "boco_parcels", "Boulder County parcels"
         BOCO_FOOTPRINTS = "boco_footprints", "Boulder County building footprints"
+        BOCO_ADDRESS_POINTS = "boco_address_points", "Boulder County address points"
 
     class Reason(models.TextChoices):
         MISSING_ID = "missing_id", "No source ID"
         UNREADABLE_GEOMETRY = "unreadable_geometry", "Geometry can't be parsed or repaired"
         NOT_POLYGONAL = "not_polygonal", "Nothing polygonal left after repair"
+        NOT_A_POINT = "not_a_point", "No single point"
+        NO_STREET_ADDRESS = "no_street_address", "No street number or street name"
 
     layer = models.CharField(max_length=32, choices=Layer.choices, db_collation="C")
     source_id = models.CharField(max_length=64, null=True, blank=True, db_collation="C")

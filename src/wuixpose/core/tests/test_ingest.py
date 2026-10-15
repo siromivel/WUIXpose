@@ -10,22 +10,25 @@ from django.utils import timezone
 
 from wuixpose.core.ingest import arcgis, boulder
 from wuixpose.core.ingest.geometry import UnreadableGeometry, multipolygon_from_geojson
-from wuixpose.core.models import RejectedFeature, Structure, Tract
+from wuixpose.core.models import Address, RejectedFeature, Structure, Tract
 from wuixpose.core.models.tracts import TractIdentifier
 
-from .factories import box, feature, multipolygon
+from .factories import address_props, box, feature, multipolygon, point_feature
 
 
 class FakeServer:
     """Serves pages of features the way an ArcGIS query endpoint does, recording each request."""
 
-    def __init__(self, features, page_size):
+    def __init__(self, features, page_size, count=None):
         self.features = features
         self.page_size = page_size
+        self.count = len(features) if count is None else count
         self.requests = []
 
     def __call__(self, url, params):
         self.requests.append((url, params))
+        if params.get("returnCountOnly") == "true":
+            return {"count": self.count}
         offset = int(params["resultOffset"])
         page = self.features[offset : offset + self.page_size]
         return {
@@ -62,6 +65,28 @@ def test_iter_features_sends_bbox_as_envelope():
     assert params["geometry"] == "-105.5,40.0,-105.3,40.1"
     assert params["geometryType"] == "esriGeometryEnvelope"
     assert params["inSR"] == "4326"
+
+
+def test_iter_features_checks_the_count_when_asked():
+    features = [feature({"PARCEL_NO": str(i)}, box(0, 0, 1, 1)) for i in range(5)]
+    server = FakeServer(features, page_size=2)
+    bbox = (-105.5, 40.0, -105.3, 40.1)
+
+    got = list(arcgis.iter_features("https://gis.example/Layer/0", where="X = 1", bbox=bbox, page_size=2, check_count=True, fetch=server))
+
+    assert len(got) == 5
+    _, count_params = server.requests[0]
+    assert count_params["returnCountOnly"] == "true"
+    assert (count_params["where"], count_params["geometry"]) == ("X = 1", "-105.5,40.0,-105.3,40.1")
+
+
+def test_iter_features_raises_when_pages_fall_short_of_the_count():
+    features = [feature({"PARCEL_NO": str(i)}, box(0, 0, 1, 1)) for i in range(5)]
+    # The server counts 7 but serves 5, as when a page comes back without the more-to-come flag.
+    server = FakeServer(features, page_size=2, count=7)
+
+    with pytest.raises(arcgis.ArcGISError, match="got 5 features but the server counts 7"):
+        list(arcgis.iter_features("https://gis.example/Layer/0", page_size=2, check_count=True, fetch=server))
 
 
 def test_fetch_json_raises_on_arcgis_error_body(monkeypatch):
@@ -283,7 +308,7 @@ def test_structures_are_assigned_to_the_tract_holding_their_footprint():
 
 
 @pytest.mark.django_db
-def test_ingest_command_loads_both_layers(monkeypatch):
+def test_ingest_command_loads_all_layers(monkeypatch):
     seen_bbox = []
 
     def fake_parcels(bbox, **kwargs):
@@ -293,8 +318,12 @@ def test_ingest_command_loads_both_layers(monkeypatch):
     def fake_footprints(bbox, **kwargs):
         return [feature({"StructureID": "S1"}, box(0.0001, 0.0001, 0.0002, 0.0002))]
 
+    def fake_addresses(bbox, **kwargs):
+        return [point_feature(address_props("1", "12", "MAIN", "A"), 0.0005, 0.0005)]
+
     monkeypatch.setattr(boulder, "fetch_parcels", fake_parcels)
     monkeypatch.setattr(boulder, "fetch_footprints", fake_footprints)
+    monkeypatch.setattr(boulder, "fetch_addresses", fake_addresses)
     out = io.StringIO()
 
     call_command("ingest_boulder", "--bbox=-105.5,40.0,-105.3,40.1", stdout=out)
@@ -302,8 +331,21 @@ def test_ingest_command_loads_both_layers(monkeypatch):
     assert seen_bbox == [(-105.5, 40.0, -105.3, 40.1)]
     structure = Structure.objects.get()
     assert structure.tract == Tract.objects.get()
+    assert Address.objects.get().tract == Tract.objects.get()
     assert "1 structure-tract assignments changed" in out.getvalue()
     assert "3 zones built or redrawn" in out.getvalue()
+    assert "1 address-tract links changed" in out.getvalue()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("bbox", "retired"), [(None, True), ("-105.5,40.0,-105.3,40.1", False)])
+def test_ingest_command_retires_missing_addresses_only_without_a_bbox(monkeypatch, bbox, retired):
+    boulder.load_addresses([point_feature(address_props("gone", "12", "MAIN"), 0, 0)])
+    monkeypatch.setattr(boulder, "fetch_addresses", lambda bbox, **kwargs: [])
+
+    call_command("ingest_boulder", "--layer=addresses", *([f"--bbox={bbox}"] if bbox else []), stdout=io.StringIO())
+
+    assert (Address.objects.get().tracked_to is not None) == retired
 
 
 def test_ingest_command_rejects_malformed_bbox():

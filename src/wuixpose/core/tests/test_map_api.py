@@ -8,7 +8,7 @@ from wuixpose.core import tiles, zones
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import Structure, Tract, Zone
 
-from .factories import ORIGIN, box, feature
+from .factories import ORIGIN, address_props, box, feature, point_feature
 
 
 def tile_for(lon: float, lat: float, z: int) -> tuple[int, int, int]:
@@ -29,8 +29,17 @@ def loaded():
         ]
     )
     boulder.load_structures([feature({"StructureID": "1N7116110001"}, box(0.0002, 0.0002, 0.0004, 0.0003))])
+    boulder.load_addresses(
+        [
+            point_feature(address_props("2", "10", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0002),
+            point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0003),
+            point_feature(address_props("4", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="10"), 0.0003, 0.0002),
+            point_feature(address_props("3", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="9"), 0.0003, 0.0002),
+        ]
+    )
     boulder.assign_structure_tracts()
     zones.build_zones()
+    boulder.link_address_tracts()
     return {
         "tract": Tract.objects.get(identifiers__value="146100000001"),
         "structure": Structure.objects.get(),
@@ -162,6 +171,16 @@ def test_tract_detail(client, loaded):
 
     assert data["id"] == tract.pk
     assert data["county_apns"] == ["146100000001"]
+    # House numbers and units sort as numbers, not text.
+    assert [(a["line1"], a["line2"]) for a in data["addresses"]] == [
+        ("9 Gold Run Rd", "CO"),
+        ("10 Gold Run Rd", "CO"),
+        ("10 Gold Run Rd #9", "CO"),
+        ("10 Gold Run Rd #10", "CO"),
+    ]
+    assert (data["addresses"][0]["lon"], data["addresses"][0]["lat"]) == pytest.approx(
+        (ORIGIN[0] + 0.0003, ORIGIN[1] + 0.0003)
+    )
     assert data["structure_ids"] == [loaded["structure"].pk]
     # 0.001 deg of longitude at 40.05 N is ~85 m and 0.001 deg of latitude ~111 m: ~2.3 acres.
     assert data["area_acres"] == pytest.approx(2.33, abs=0.05)
@@ -177,6 +196,7 @@ def test_structure_detail(client, loaded):
     assert data["tract_county_apns"] == ["146100000001"]
     assert data["source"] == "boco_footprints"
     assert data["source_id"] == "1N7116110001"
+    assert len(data["tract_addresses"]) == 4
     # ~17 m x 11 m.
     assert data["footprint_sq_ft"] == pytest.approx(2040, rel=0.05)
 
@@ -201,11 +221,31 @@ def test_summary_reports_extent_of_tracts(client, loaded):
 
     assert data["tract_count"] == 2
     assert data["structure_count"] == 1
+    assert data["address_count"] == 4
     min_lon, min_lat, max_lon, max_lat = data["bbox"]
     assert (min_lon, min_lat) == pytest.approx(ORIGIN)
     assert (max_lon, max_lat) == pytest.approx((ORIGIN[0] + 0.002, ORIGIN[1] + 0.001))
 
 
 @pytest.mark.django_db
+def test_retired_addresses_are_left_out(client, loaded):
+    boulder.load_addresses(
+        [point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STATUS="RETIRED"), 0.0003, 0.0003)]
+    )
+
+    tract = client.get(reverse("tract-detail", args=[loaded["tract"].pk])).json()
+    summary = client.get(reverse("summary")).json()
+
+    assert "9 Gold Run Rd" not in [a["line1"] for a in tract["addresses"]]
+    assert len(tract["addresses"]) == 3
+    assert summary["address_count"] == 3
+
+
+@pytest.mark.django_db
 def test_summary_with_no_data(client):
-    assert client.get(reverse("summary")).json() == {"tract_count": 0, "structure_count": 0, "bbox": None}
+    assert client.get(reverse("summary")).json() == {
+        "tract_count": 0,
+        "structure_count": 0,
+        "address_count": 0,
+        "bbox": None,
+    }

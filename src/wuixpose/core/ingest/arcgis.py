@@ -42,6 +42,30 @@ def fetch_json(url: str, params: dict[str, str], *, attempts: int = 3, timeout: 
     raise AssertionError("unreachable")
 
 
+def _filter_params(where: str, bbox: tuple[float, float, float, float] | None) -> dict[str, str]:
+    params = {"where": where}
+    if bbox is not None:
+        params |= {
+            "geometry": ",".join(str(v) for v in bbox),
+            "geometryType": "esriGeometryEnvelope",
+            "inSR": "4326",
+            "spatialRel": "esriSpatialRelIntersects",
+        }
+    return params
+
+
+def count_features(
+    layer_url: str,
+    *,
+    where: str = "1=1",
+    bbox: tuple[float, float, float, float] | None = None,
+    fetch: FetchJson = fetch_json,
+) -> int:
+    """How many features match where and bbox, as the server counts them."""
+    body = fetch(f"{layer_url}/query", _filter_params(where, bbox) | {"returnCountOnly": "true", "f": "json"})
+    return int(body["count"])
+
+
 def iter_features(
     layer_url: str,
     *,
@@ -49,15 +73,21 @@ def iter_features(
     out_fields: tuple[str, ...] = ("*",),
     bbox: tuple[float, float, float, float] | None = None,
     page_size: int = 2000,
+    check_count: bool = False,
     fetch: FetchJson = fetch_json,
 ) -> Iterator[dict[str, Any]]:
     """Yield GeoJSON features (lon/lat, SRID 4326) from a layer, paging by OBJECTID.
 
     bbox is (min_lon, min_lat, max_lon, max_lat) and keeps features that intersect it.
     The server reprojects to 4326 itself (outSR), so no client-side transform is needed.
+
+    With check_count, the server's count is fetched first and ArcGISError raised after the last
+    page if the pages didn't add up to it. Paging ends at the first empty or final-looking page, so
+    without the check a short response passes for the end of the layer. Use it when a missing
+    feature means something, as when a load retires what it didn't see. The layer changing
+    mid-fetch also fails the check; running again is the fix.
     """
-    params = {
-        "where": where,
+    params = _filter_params(where, bbox) | {
         "outFields": ",".join(out_fields),
         "returnGeometry": "true",
         "outSR": "4326",
@@ -66,13 +96,7 @@ def iter_features(
         "orderByFields": "OBJECTID",
         "resultRecordCount": str(page_size),
     }
-    if bbox is not None:
-        params |= {
-            "geometry": ",".join(str(v) for v in bbox),
-            "geometryType": "esriGeometryEnvelope",
-            "inSR": "4326",
-            "spatialRel": "esriSpatialRelIntersects",
-        }
+    expected = count_features(layer_url, where=where, bbox=bbox, fetch=fetch) if check_count else None
 
     offset = 0
     while True:
@@ -84,4 +108,7 @@ def iter_features(
         # "properties" on others.
         more = page.get("exceededTransferLimit") or page.get("properties", {}).get("exceededTransferLimit")
         if not features or not more:
-            return
+            break
+
+    if expected is not None and offset != expected:
+        raise ArcGISError(f"{layer_url}: got {offset} features but the server counts {expected}")

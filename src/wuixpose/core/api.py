@@ -4,6 +4,8 @@ Shapes themselves go to the map as vector tiles (see tiles.py); these endpoints 
 attributes a popup or side panel needs.
 """
 
+import re
+
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSGeometry
 from django.shortcuts import get_object_or_404
@@ -11,7 +13,7 @@ from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Structure, Tract
+from .models import Address, Structure, Tract
 
 # NAD83 / CONUS Albers, an equal-area projection in meters, for measuring areas in the US.
 EQUAL_AREA_SRID = 5070
@@ -27,14 +29,46 @@ def county_apns(tract: Tract) -> list[str]:
     return [i.value for i in tract.identifiers.all() if i.tracked_to is None]
 
 
+class AddressSerializer(serializers.ModelSerializer):
+    line1 = serializers.CharField(source="display_line1")
+    line2 = serializers.CharField(source="display_line2")
+    lon = serializers.FloatField(source="geom.x")
+    lat = serializers.FloatField(source="geom.y")
+
+    class Meta:
+        model = Address
+        fields = ("id", "line1", "line2", "lon", "lat")
+
+
+def _natural(text: str) -> tuple:
+    """A sort key that orders runs of digits as numbers: "#9" before "#10"."""
+    return tuple((0, int(part)) if part.isdigit() else (1, part) for part in re.split(r"(\d+)", text) if part)
+
+
+def _address_order(address: Address) -> tuple:
+    """Street, then house number, then unit, numbers in numeric order: 9 Main St before 10 Main St."""
+    return (address.street, _natural(address.number), _natural(address.unit))
+
+
+def tract_addresses(tract_id: int | None) -> list[dict]:
+    if tract_id is None:
+        return []
+    addresses = sorted(Address.objects.current().filter(tract_id=tract_id), key=_address_order)
+    return AddressSerializer(addresses, many=True).data
+
+
 class TractSerializer(serializers.ModelSerializer):
+    addresses = serializers.SerializerMethodField()
     county_apns = serializers.SerializerMethodField()
     area_acres = serializers.SerializerMethodField()
     structure_ids = serializers.SerializerMethodField()
 
     class Meta:
         model = Tract
-        fields = ("id", "county_apns", "area_acres", "structure_ids")
+        fields = ("id", "addresses", "county_apns", "area_acres", "structure_ids")
+
+    def get_addresses(self, tract: Tract) -> list[dict]:
+        return tract_addresses(tract.pk)
 
     def get_county_apns(self, tract: Tract) -> list[str]:
         return county_apns(tract)
@@ -49,13 +83,18 @@ class TractSerializer(serializers.ModelSerializer):
 class StructureSerializer(serializers.ModelSerializer):
     tract_county_apns = serializers.SerializerMethodField()
     footprint_sq_ft = serializers.SerializerMethodField()
+    # Addresses aren't linked to structures yet, so a structure shows its lot's.
+    tract_addresses = serializers.SerializerMethodField()
 
     class Meta:
         model = Structure
-        fields = ("id", "source", "source_id", "tract", "tract_county_apns", "footprint_sq_ft")
+        fields = ("id", "source", "source_id", "tract", "tract_county_apns", "tract_addresses", "footprint_sq_ft")
 
     def get_tract_county_apns(self, structure: Structure) -> list[str]:
         return county_apns(structure.tract) if structure.tract else []
+
+    def get_tract_addresses(self, structure: Structure) -> list[dict]:
+        return tract_addresses(structure.tract_id)
 
     def get_footprint_sq_ft(self, structure: Structure) -> int:
         return round(area_sq_m(structure.geom) * SQ_FT_PER_SQ_M)
@@ -81,6 +120,7 @@ def summary(request):
         {
             "tract_count": Tract.objects.count(),
             "structure_count": Structure.objects.count(),
+            "address_count": Address.objects.current().count(),
             "bbox": list(extent) if extent else None,  # [min_lon, min_lat, max_lon, max_lat]
         }
     )

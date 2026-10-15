@@ -5,11 +5,21 @@ export type Bbox = [minLon: number, minLat: number, maxLon: number, maxLat: numb
 export interface Summary {
   tract_count: number
   structure_count: number
+  address_count: number
   bbox: Bbox | null
+}
+
+export interface Address {
+  id: number
+  line1: string // number, street and unit: "1172 Valley Ln"
+  line2: string // jurisdiction, state and ZIP: "Unincorporated Boulder County, CO 80302"
+  lon: number
+  lat: number
 }
 
 export interface TractDetail {
   id: number
+  addresses: Address[]
   county_apns: string[]
   area_acres: number
   structure_ids: number[]
@@ -21,6 +31,7 @@ export interface StructureDetail {
   source_id: string | null
   tract: number | null
   tract_county_apns: string[]
+  tract_addresses: Address[]
   footprint_sq_ft: number
 }
 

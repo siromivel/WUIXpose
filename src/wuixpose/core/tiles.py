@@ -112,7 +112,9 @@ def render_tile(layer_name: str, z: int, x: int, y: int) -> bytes:
         cursor.execute(
             sql, {"z": z, "x": x, "y": y, "layer": layer_name, "rule_version": zones.RULE_VERSION}
         )
-        (tile,) = cursor.fetchone()
+        row = cursor.fetchone()
+        assert row is not None  # an aggregate without GROUP BY always returns a row
+        (tile,) = row
     return bytes(tile or b"")
 
 

@@ -13,7 +13,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection, transaction
@@ -308,8 +308,9 @@ def load_addresses(
     with transaction.atomic():
         rejects.record(rejected)
         ours = Address.objects.filter(source=source)
+        # Never null: the filter only matches IDs from by_id.
         existing = {
-            a.source_id: a
+            cast(str, a.source_id): a
             for a in ours.filter(source_id__in=list(by_id)).only("source_id", "tracked_to", *ADDRESS_FIELDS)
         }
         # Rewriting every row is most of a countywide load's time, and few change between runs.
@@ -458,7 +459,9 @@ def assign_structure_tracts(*, full: bool = False) -> AssignResult:
         cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [job])
         # The transaction's start, the same clock the geom_updated_at trigger stamps with.
         cursor.execute("SELECT now()")
-        (started_at,) = cursor.fetchone()
+        row = cursor.fetchone()
+        assert row is not None  # now() always returns a row
+        (started_at,) = row
         since = (
             None
             if full

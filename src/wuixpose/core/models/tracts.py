@@ -1,7 +1,16 @@
+from typing import TYPE_CHECKING
+
 from django.contrib.gis.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Now
 from django.utils import timezone
+
+if TYPE_CHECKING:
+    # RelatedManager exists only in the type stubs.
+    from django.db.models.manager import RelatedManager
+
+    from .addresses import Address
+    from .structures import Structure
 
 # Geometries are stored as longitude/latitude in degrees (SRID 4326, the GPS standard).
 # A degree is not a fixed distance: it's ~364,000 ft north-south everywhere, but east-west
@@ -20,6 +29,11 @@ class Tract(models.Model):
     # so every writer gets it, including bulk updates and raw SQL; values written from Python
     # are ignored. Jobs that depend on geometry use it to find what changed since their last run.
     geom_updated_at = models.DateTimeField(db_default=Now(), db_index=True, editable=False)
+
+    # Reverse relations, declared for the type checker; Django adds them at runtime.
+    addresses: "RelatedManager[Address]"
+    identifiers: "RelatedManager[TractIdentifier]"
+    structures: "RelatedManager[Structure]"
 
     def __str__(self) -> str:
         return f"Tract {self.pk}"
@@ -47,6 +61,7 @@ class TractIdentifier(models.Model):
         COUNTY_APN = "county_apn", "County APN"
 
     tract = models.ForeignKey(Tract, on_delete=models.CASCADE, related_name="identifiers")
+    tract_id: int
     scheme = models.CharField(max_length=32, choices=Scheme.choices, db_collation="C")
     county_fips = models.CharField(max_length=5, db_collation="C")
     value = models.CharField(max_length=64, db_collation="C")

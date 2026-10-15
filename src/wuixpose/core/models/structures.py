@@ -1,8 +1,14 @@
+from typing import TYPE_CHECKING
+
 from django.contrib.gis.db import models
 from django.db.models import Q
 from django.db.models.functions import Now
 
 from .tracts import STORAGE_SRID
+
+if TYPE_CHECKING:
+    # RelatedManager exists only in the type stubs.
+    from django.db.models.manager import RelatedManager
 
 
 class Structure(models.Model):
@@ -25,10 +31,14 @@ class Structure(models.Model):
         blank=True,
         related_name="structures",
     )
+    tract_id: int | None
     # When this row's geometry last changed. Maintained by a database trigger (migration 0003),
     # so every writer gets it, including bulk updates and raw SQL; values written from Python
     # are ignored. Jobs that depend on geometry use it to find what changed since their last run.
     geom_updated_at = models.DateTimeField(db_default=Now(), db_index=True, editable=False)
+
+    # Reverse relation, declared for the type checker; Django adds it at runtime.
+    zones: "RelatedManager[Zone]"
 
     class Meta:
         constraints = (
@@ -54,6 +64,7 @@ class Zone(models.Model):
     """
 
     structure = models.ForeignKey(Structure, on_delete=models.CASCADE, related_name="zones")
+    structure_id: int
     ring_key = models.CharField(max_length=32, db_collation="C")  # e.g. "hiz_0_5"; zones.RINGS
     rule_version = models.PositiveIntegerField()
     geom = models.MultiPolygonField(srid=STORAGE_SRID)

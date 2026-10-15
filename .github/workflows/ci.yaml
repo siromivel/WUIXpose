@@ -56,6 +56,9 @@ jobs:
       - name: Lint
         run: uv run ruff check
 
+      - name: Type check
+        run: uv run pyright
+
       - name: Check for missing migrations
         working-directory: src/wuixpose
         run: uv run python manage.py makemigrations --check --dry-run

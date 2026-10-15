@@ -141,7 +141,7 @@ def retired(address_id: str) -> dict:
     return point_feature(address_props(address_id, "99", "ELSEWHERE", STATUS="RETIRED"), 0.01, 0.01)
 
 
-def tracked() -> dict[str, tuple[date, date | None]]:
+def tracked() -> dict[str | None, tuple[date, date | None]]:
     return {a.source_id: (a.tracked_from, a.tracked_to) for a in Address.objects.all()}
 
 

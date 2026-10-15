@@ -97,7 +97,9 @@ def build_zones(*, full: bool = False) -> BuildResult:
         cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [job])
         # The transaction's start, the same clock the geom_updated_at trigger stamps with.
         cursor.execute("SELECT now()")
-        (started_at,) = cursor.fetchone()
+        row = cursor.fetchone()
+        assert row is not None  # now() always returns a row
+        (started_at,) = row
         since = (
             None
             if full

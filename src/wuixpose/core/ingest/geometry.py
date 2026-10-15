@@ -2,15 +2,19 @@ import json
 from collections.abc import Iterable
 from typing import Any
 
-from django.contrib.gis.gdal import GDALException, OGRGeometry
+# The stubs' OGRGeometry predates set_3d and set_measured (Django 5.1), so it's left untyped.
+from django.contrib.gis.gdal import (
+    GDALException,
+    OGRGeometry,  # pyright: ignore[reportAttributeAccessIssue]
+)
 from django.contrib.gis.geos import (
-    GEOSException,
     GEOSGeometry,
     MultiPoint,
     MultiPolygon,
     Point,
     Polygon,
 )
+from django.contrib.gis.geos.error import GEOSException
 
 from wuixpose.core.models.tracts import STORAGE_SRID
 
@@ -68,7 +72,8 @@ def as_multipolygon(geoms: Iterable[GEOSGeometry]) -> MultiPolygon | None:
     polygons: list[Polygon] = []
     for geom in geoms:
         if not geom.valid:
-            geom = geom.make_valid()
+            # make_valid (Django 4.1+) is missing from the stubs.
+            geom = geom.make_valid()  # pyright: ignore[reportAttributeAccessIssue]
         polygons.extend(_polygons(geom))
     if not polygons:
         return None

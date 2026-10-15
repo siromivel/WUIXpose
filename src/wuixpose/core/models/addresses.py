@@ -1,4 +1,5 @@
 import re
+from typing import ClassVar, Self
 
 from django.contrib.gis.db import models
 from django.db.models import F, Q
@@ -32,8 +33,8 @@ def _display_case(text: str) -> str:
     return " ".join(words)
 
 
-class AddressQuerySet(models.QuerySet):
-    def current(self):
+class AddressQuerySet(models.QuerySet["Address"]):
+    def current(self) -> Self:
         return self.filter(tracked_to__isnull=True)
 
 
@@ -76,13 +77,17 @@ class Address(models.Model):
         blank=True,
         related_name="addresses",
     )
+    tract_id: int | None
 
     # WUIXpose's own dates, as on TractIdentifier: from the day we first loaded the address until
     # the day an ingest found it retired or gone. Cleared if it comes back; tracked_from stays.
     tracked_from = models.DateField(default=timezone.localdate)
     tracked_to = models.DateField(null=True, blank=True)  # null = current
 
-    objects = AddressQuerySet.as_manager()
+    # The stubs type as_manager() as a plain Manager, losing current(). The manager it builds
+    # proxies the queryset's methods, and the stubs already model Manager as a QuerySet, so
+    # typing it as the queryset lets current() type-check, including after filter() and the like.
+    objects: ClassVar[AddressQuerySet] = AddressQuerySet.as_manager()  # pyright: ignore[reportAssignmentType, reportIncompatibleVariableOverride]
 
     class Meta:
         constraints = (

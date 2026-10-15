@@ -35,7 +35,7 @@ class AddressSerializer(serializers.ModelSerializer):
     lon = serializers.FloatField(source="geom.x")
     lat = serializers.FloatField(source="geom.y")
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Address
         fields = ("id", "line1", "line2", "lon", "lat")
 
@@ -63,7 +63,7 @@ class TractSerializer(serializers.ModelSerializer):
     area_acres = serializers.SerializerMethodField()
     structure_ids = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Tract
         fields = ("id", "addresses", "county_apns", "area_acres", "structure_ids")
 
@@ -86,7 +86,7 @@ class StructureSerializer(serializers.ModelSerializer):
     # Addresses aren't linked to structures yet, so a structure shows its lot's.
     tract_addresses = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Structure
         fields = ("id", "source", "source_id", "tract", "tract_county_apns", "tract_addresses", "footprint_sq_ft")
 

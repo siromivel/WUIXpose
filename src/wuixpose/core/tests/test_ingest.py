@@ -4,7 +4,6 @@ import logging
 from datetime import date
 
 import pytest
-from django.contrib.gis.geos import GEOSGeometry
 from django.core.management import CommandError, call_command
 from django.utils import timezone
 
@@ -357,4 +356,4 @@ def test_geojson_coordinates_are_lon_lat():
     # Guards the axis order assumption the whole pipeline rests on.
     geom = multipolygon_from_geojson({"type": "Polygon", "coordinates": [box(0, 0, 0.001, 0.001)]})
     assert geom is not None
-    assert GEOSGeometry(geom.centroid).x == pytest.approx(-105.3995)
+    assert geom.centroid.x == pytest.approx(-105.3995)

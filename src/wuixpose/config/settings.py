@@ -35,7 +35,8 @@ else:
     except ImproperlyConfigured as exc:
         raise ImproperlyConfigured("Set DJANGO_SECRET_KEY, or DJANGO_DEBUG=true for local development") from exc
 
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"] if DEBUG else [])
+# django-environ leaves list()'s default unannotated, so pyright infers it can only be NOTSET.
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"] if DEBUG else [])  # pyright: ignore[reportArgumentType]
 
 
 # Application definition

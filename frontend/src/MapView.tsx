@@ -28,10 +28,17 @@ import {
 // either one. Let Vite bundle the worker and tell MapLibre where it went.
 setWorkerUrl(maplibreWorkerUrl)
 
+// A point to fly to. Each new object flies again, even to the same point.
+export interface Focus {
+  lon: number
+  lat: number
+}
+
 interface Props {
   initialBbox: Bbox | null
   tileSources: TileSources
   visible: LayerVisibility
+  focus: Focus | null
   selection: Selection
   onSelect: (selection: Selection) => void
   onZoom: (zoom: number) => void
@@ -70,6 +77,8 @@ const ringColor = byRing((ring) => ring.color, ZONE_FALLBACK_COLOR)
 const ringRank = byRing((_, i) => ZONE_RINGS.length - i, 0)
 // Meters. Enough to order the rings in the depth buffer, too little to see when the map is tilted.
 const ZONE_SLAB_STEP = 0.25
+// Close enough to see a house's zones and its neighbors'.
+const FOCUS_ZOOM = 17
 
 // Zones belonging to the selection: a structure's own, or those of every structure on a lot.
 function zonesOf(selection: Selection): FilterSpecification {
@@ -191,7 +200,7 @@ function featureId(selection: NonNullable<Selection>): FeatureIdentifier {
   return { source: layer, sourceLayer: layer, id: selection.id }
 }
 
-export function MapView({ initialBbox, tileSources, visible, selection, onSelect, onZoom }: Props) {
+export function MapView({ initialBbox, tileSources, visible, focus, selection, onSelect, onZoom }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   // Only the first values matter: they set the opening view and the sources.
@@ -289,6 +298,11 @@ export function MapView({ initialBbox, tileSources, visible, selection, onSelect
   useEffect(() => {
     if (map) map.setFilter('zones-selected-fill', zonesOf(selection))
   }, [map, selection])
+
+  // Keep the zoom if already closer in.
+  useEffect(() => {
+    if (map && focus) map.flyTo({ center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), FOCUS_ZOOM) })
+  }, [map, focus])
 
   return <div ref={container} className="map" />
 }

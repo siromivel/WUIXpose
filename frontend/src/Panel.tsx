@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 
-import { type Address, type StructureDetail, type Summary, type TractDetail, fetchStructure, fetchTract } from './api'
+import { AddressSearch } from './AddressSearch'
+import {
+  type Address,
+  type SearchResult,
+  type StructureDetail,
+  type Summary,
+  type TractDetail,
+  fetchStructure,
+  fetchTract,
+} from './api'
 import { type LayerVisibility, type Selection, type TileSources, ZONE_RINGS } from './layers'
 
 interface Props {
@@ -12,6 +21,7 @@ interface Props {
   onToggle: (layer: keyof LayerVisibility) => void
   selection: Selection
   onSelect: (selection: Selection) => void
+  onPickAddress: (result: SearchResult) => void
 }
 
 const LAYER_LABELS: Record<keyof LayerVisibility, string> = {
@@ -23,13 +33,27 @@ const LAYER_LABELS: Record<keyof LayerVisibility, string> = {
 
 const number = new Intl.NumberFormat('en-US')
 
-export function Panel({ summary, tileSources, loadError, zoom, visible, onToggle, selection, onSelect }: Props) {
+export function Panel({
+  summary,
+  tileSources,
+  loadError,
+  zoom,
+  visible,
+  onToggle,
+  selection,
+  onSelect,
+  onPickAddress,
+}: Props) {
   return (
     <aside className="panel">
       <header>
         <h1>WUIXpose</h1>
         <p className="subtitle">Wildfire mitigation assessment for homes in the wildland-urban interface</p>
       </header>
+
+      <section>
+        <AddressSearch onPick={onPickAddress} />
+      </section>
 
       <section>
         <h2>Loaded</h2>

@@ -51,6 +51,15 @@ export const fetchTract = (id: number, signal?: AbortSignal) =>
 export const fetchStructure = (id: number, signal?: AbortSignal) =>
   getJson<StructureDetail>(`/api/structures/${id}/`, signal)
 
+export interface SearchResult extends Address {
+  tract: number | null
+}
+
+export async function searchAddresses(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q: query })
+  return (await getJson<{ results: SearchResult[] }>(`/api/search/?${params}`, signal)).results
+}
+
 // TileJSON 3.0.0, the subset this app reads. The server builds it in src/wuixpose/core/tiles.py.
 export interface TileJSON {
   tilejson: string

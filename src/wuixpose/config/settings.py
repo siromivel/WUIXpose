@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
+    'django.contrib.postgres',  # trigram lookups for address search
     'rest_framework',
     'wuixpose.core.apps.CoreConfig',
 ]

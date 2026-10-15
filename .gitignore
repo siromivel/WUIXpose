@@ -9,4 +9,8 @@ __pycache__/
 .coverage
 htmlcov/
 
+mise.local.toml
+mise.*.local.toml
+.claude
+
 .DS_Store

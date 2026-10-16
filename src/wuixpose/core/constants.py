@@ -24,6 +24,11 @@ SQ_FT_PER_SQ_M = 10.763910417
 # Rows per statement for bulk_create and bulk_update.
 DB_BATCH_SIZE = 2000
 
+# A structure belongs to the tract holding at least this share of its footprint. Lot lines and
+# footprints are digitized separately, so a house wholly on one lot often pokes a few percent
+# over the line; a footprint split more evenly than this has no single tract.
+MIN_TRACT_SHARE = 0.9
+
 # Credit required by CC BY 4.0 wherever Boulder County data is shown. HTML, as map clients render it.
 BOULDER_COUNTY_ATTRIBUTION = (
     'Parcels, footprints and addresses: <a href="https://opendata-bouldercounty.hub.arcgis.com/">Boulder County</a>, '

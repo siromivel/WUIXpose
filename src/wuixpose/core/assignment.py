@@ -11,11 +11,7 @@ from django.db import connection, transaction
 from wuixpose.core.jobs import incremental_run
 from wuixpose.core.models import JobRun
 from wuixpose.core.models.tracts import TractIdentifier
-
-# A structure belongs to the tract holding at least this share of its footprint. Lot lines and
-# footprints are digitized separately, so a house wholly on one lot often pokes a few percent
-# over the line; a footprint split more evenly than this has no single tract.
-MIN_TRACT_SHARE = 0.9
+from wuixpose.core.constants import MIN_TRACT_SHARE
 
 
 _LINK_ADDRESSES = """

@@ -8,11 +8,10 @@ from dataclasses import dataclass
 
 from django.db import connection, transaction
 
+from wuixpose.core.constants import MIN_TRACT_SHARE
 from wuixpose.core.jobs import incremental_run
 from wuixpose.core.models import JobRun
 from wuixpose.core.models.tracts import TractIdentifier
-from wuixpose.core.constants import MIN_TRACT_SHARE
-
 
 _LINK_ADDRESSES = """
     WITH best AS (

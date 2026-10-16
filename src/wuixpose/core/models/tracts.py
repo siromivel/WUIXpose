@@ -39,21 +39,6 @@ class Tract(models.Model):
         return f"Tract {self.pk}"
 
 
-class TractIdentifierQuerySet(models.QuerySet):
-    def lookup(self, county_fips: str, value: str, scheme: str = "county_apn", *, include_history=False):
-        """Find identifiers by (scheme, county, value) in a form that can use the partial indexes.
-
-        Postgres only uses a partial index when the WHERE clause implies its predicate, so a bare
-        (scheme, county_fips, value) filter uses neither index below. Spelling out both tracking
-        cases lets the planner BitmapOr the two.
-        """
-        key = Q(scheme=scheme, county_fips=county_fips, value=value)
-
-        if not include_history:
-            return self.filter(key, tracked_to__isnull=True)
-        return self.filter((key & Q(tracked_to__isnull=True)) | (key & Q(tracked_to__isnull=False)))
-
-
 class TractIdentifier(models.Model):
     """An external identifier a tract has carried (county APN first). A tract may have none or many."""
 
@@ -70,8 +55,6 @@ class TractIdentifier(models.Model):
     # every row from one run shares it; the default covers anything else that creates rows.
     tracked_from = models.DateField(default=timezone.localdate)
     tracked_to = models.DateField(null=True, blank=True)  # null = current
-
-    objects = TractIdentifierQuerySet.as_manager()
 
     class Meta:
         constraints = (

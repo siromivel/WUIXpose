@@ -10,36 +10,6 @@ from wuixpose.core.models.tracts import STORAGE_SRID, TractIdentifier
 
 from .factories import ORIGIN, address_props, box, feature, point_feature
 
-# Display
-
-
-@pytest.mark.parametrize(
-    ("number", "street", "unit", "line1"),
-    [
-        ("1172", "VALLEY LN", "", "1172 Valley Ln"),
-        ("4500", "S 19TH ST", "APT N304", "4500 S 19th St Apt N304"),
-        ("2615", "COUNTY ROAD 128J", "", "2615 County Road 128J"),
-        ("2211", "PRATT ST", "#7D", "2211 Pratt St #7D"),
-        ("1172 1/2", "MCCASLIN BLVD", "", "1172 1/2 McCaslin Blvd"),
-        ("40", "O'NEIL WAY", "", "40 O'Neil Way"),
-    ],
-)
-def test_display_line1(number, street, unit, line1):
-    assert Address(number=number, street=street, unit=unit).display_line1() == line1
-
-
-@pytest.mark.parametrize(
-    ("jurisdiction", "zip_code", "line2"),
-    [
-        ("UNINCORPORATED BOULDER COUNTY", "80302", "Unincorporated Boulder County, CO 80302"),
-        ("LONGMONT", "80501", "Longmont, CO 80501"),
-        ("", "", "CO"),
-    ],
-)
-def test_display_line2(jurisdiction, zip_code, line2):
-    assert Address(jurisdiction=jurisdiction, state="CO", zip_code=zip_code).display_line2() == line2
-
-
 # Loading
 
 

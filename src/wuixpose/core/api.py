@@ -13,6 +13,7 @@ from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .display import address_line1, address_line2
 from .models import Address, Structure, Tract
 from .search import search_addresses
 
@@ -31,14 +32,20 @@ def county_apns(tract: Tract) -> list[str]:
 
 
 class AddressSerializer(serializers.ModelSerializer):
-    line1 = serializers.CharField(source="display_line1")
-    line2 = serializers.CharField(source="display_line2")
+    line1 = serializers.SerializerMethodField()
+    line2 = serializers.SerializerMethodField()
     lon = serializers.FloatField(source="geom.x")
     lat = serializers.FloatField(source="geom.y")
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Address
         fields = ("id", "line1", "line2", "lon", "lat")
+
+    def get_line1(self, address: Address) -> str:
+        return address_line1(address)
+
+    def get_line2(self, address: Address) -> str:
+        return address_line2(address)
 
 
 def _natural(text: str) -> tuple:

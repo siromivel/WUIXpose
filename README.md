@@ -197,6 +197,7 @@ src/wuixpose/
     zones.py  ring definitions and the job that draws them
     tiles.py  vector tiles
     search.py address normalization and search
+    display.py address formatting for display
     api.py    JSON endpoints
 frontend/   React + MapLibre map UI
 ```

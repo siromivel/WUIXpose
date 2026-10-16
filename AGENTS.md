@@ -86,7 +86,7 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Business logic goes in plain service functions, not in views, model methods or management
   commands. Commands stay thin wrappers (see `build_zones`).
 - Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `search.py`,
-  `ingest/`.
+  `display.py`, `ingest/`.
   Add a new module for a new feature rather than growing an unrelated one.
 - Use the ORM. Raw SQL only when GeoDjango can't express a PostGIS query,
   and always parameterized, never string-formatted.

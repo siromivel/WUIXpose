@@ -31,5 +31,13 @@ def test_address_line2(jurisdiction, zip_code, line2):
     assert address_line2(Address(jurisdiction=jurisdiction, state="CO", zip_code=zip_code)) == line2
 
 
-def test_str_is_line1():
-    assert str(Address(number="1172", street="VALLEY LN", unit="")) == "1172 Valley Ln"
+@pytest.mark.parametrize(
+    ("unit", "text"),
+    [
+        ("", "1172 VALLEY LN"),
+        ("#206", "1172 VALLEY LN #206"),
+    ],
+)
+def test_str_is_stored_text(unit, text):
+    # Models don't import display.py, so __str__ shows the text as stored.
+    assert str(Address(number="1172", street="VALLEY LN", unit=unit)) == text

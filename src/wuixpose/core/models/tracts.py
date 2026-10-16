@@ -5,21 +5,14 @@ from django.db.models import F, Q
 from django.db.models.functions import Now
 from django.utils import timezone
 
+from wuixpose.core.constants import STORAGE_SRID
+
 if TYPE_CHECKING:
     # RelatedManager exists only in the type stubs.
     from django.db.models.manager import RelatedManager
 
     from .addresses import Address
     from .structures import Structure
-
-# Geometries are stored as longitude/latitude in degrees (SRID 4326, the GPS standard).
-# A degree is not a fixed distance: it's ~364,000 ft north-south everywhere, but east-west
-# it shrinks toward the poles (~280,000 ft in Colorado). So never buffer or measure
-# directly on these geometries, e.g. geom.buffer(5) means 5 *degrees*, not 5 feet.
-# For distances, first convert the geometry to a projected coordinate system that
-# uses meters (geom.transform(<local UTM SRID>)), or cast to PostGIS `geography`,
-# which measures in meters on the Earth's surface.
-STORAGE_SRID = 4326
 
 
 class Tract(models.Model):

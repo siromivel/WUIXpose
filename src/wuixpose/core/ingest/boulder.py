@@ -5,6 +5,8 @@ All three layers are published by Boulder County under CC BY 4.0:
 - Building footprints, unincorporated county only, from Land Use. Cities keep their own.
 - Address points, countywide, from the Assessor's Office (AddressOne). The county notes a backlog
   of new developments not yet addressed.
+
+Shown with constants.BOULDER_COUNTY_ATTRIBUTION.
 """
 
 import logging
@@ -19,6 +21,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection, transaction
 from django.utils import timezone
 
+from wuixpose.core.constants import DB_BATCH_SIZE
 from wuixpose.core.ingest import rejects
 from wuixpose.core.ingest.arcgis import iter_features
 from wuixpose.core.ingest.geometry import (
@@ -34,21 +37,14 @@ from wuixpose.core.search import address_search_text
 logger = logging.getLogger(__name__)
 
 COUNTY_FIPS = "08013"
+STATE = "CO"
 PARCELS_URL = "https://maps.bouldercounty.org/arcgis/rest/services/Emap/BOCO_Parcels/MapServer/0"
 FOOTPRINTS_URL = "https://maps.bouldercounty.org/arcgis/rest/services/PARCELS/BUILDINGS_STRUCTURE_FOOTPRINT/MapServer/0"
 ADDRESSES_URL = "https://maps.bouldercounty.org/arcgis/rest/services/PARCELS/ADDRESS_POINTS/MapServer/0"
-# Credit required by CC BY 4.0 wherever this data is shown. HTML, as map clients render it.
-ATTRIBUTION = (
-    'Parcels, footprints and addresses: <a href="https://opendata-bouldercounty.hub.arcgis.com/">Boulder County</a>, '
-    '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>'
-)
-
 # A structure belongs to the tract holding at least this share of its footprint. Lot lines and
 # footprints are digitized separately, so a house wholly on one lot often pokes a few percent
 # over the line; a footprint split more evenly than this has no single tract.
 MIN_TRACT_SHARE = 0.9
-
-BATCH_SIZE = 2000
 
 Bbox = tuple[float, float, float, float]
 
@@ -169,11 +165,11 @@ def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None
         )
 
         to_update = [Tract(pk=tract_id, geom=by_apn[apn]) for apn, tract_id in existing.items()]
-        Tract.objects.bulk_update(to_update, ["geom"], batch_size=BATCH_SIZE)
+        Tract.objects.bulk_update(to_update, ["geom"], batch_size=DB_BATCH_SIZE)
         result.updated = len(to_update)
 
         new_apns = [apn for apn in by_apn if apn not in existing]
-        tracts = Tract.objects.bulk_create([Tract(geom=by_apn[apn]) for apn in new_apns], batch_size=BATCH_SIZE)
+        tracts = Tract.objects.bulk_create([Tract(geom=by_apn[apn]) for apn in new_apns], batch_size=DB_BATCH_SIZE)
         TractIdentifier.objects.bulk_create(
             [
                 TractIdentifier(
@@ -185,7 +181,7 @@ def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None
                 )
                 for apn, tract in zip(new_apns, tracts, strict=True)
             ],
-            batch_size=BATCH_SIZE,
+            batch_size=DB_BATCH_SIZE,
         )
         result.created = len(tracts)
     return result
@@ -203,12 +199,12 @@ def load_structures(features: Iterable[dict[str, Any]]) -> LoadResult:
             Structure.objects.filter(source=source, source_id__in=list(by_id)).values_list("source_id", "pk")
         )
         to_update = [Structure(pk=pk, geom=by_id[sid]) for sid, pk in existing.items()]
-        Structure.objects.bulk_update(to_update, ["geom"], batch_size=BATCH_SIZE)
+        Structure.objects.bulk_update(to_update, ["geom"], batch_size=DB_BATCH_SIZE)
         result.updated = len(to_update)
 
         created = Structure.objects.bulk_create(
             [Structure(geom=geom, source=source, source_id=sid) for sid, geom in by_id.items() if sid not in existing],
-            batch_size=BATCH_SIZE,
+            batch_size=DB_BATCH_SIZE,
         )
         result.created = len(created)
     return result
@@ -241,11 +237,11 @@ def _address_fields(props: dict[str, Any]) -> dict[str, Any] | None:
         "street": street,
         "unit": unit,
         "jurisdiction": jurisdiction,
-        "state": "CO",
+        "state": STATE,
         "zip_code": zip_code,
         "county_fips": COUNTY_FIPS if apn else None,
         "county_apn": apn or None,
-        "search_text": address_search_text(number, street, unit, jurisdiction, "CO", zip_code),
+        "search_text": address_search_text(number, street, unit, jurisdiction, STATE, zip_code),
     }
 
 
@@ -340,7 +336,7 @@ def load_addresses(
                 setattr(address, name, value)
             address.tracked_to = None
             to_update.append(address)
-        Address.objects.bulk_update(to_update, [*ADDRESS_FIELDS, "tracked_to"], batch_size=BATCH_SIZE)
+        Address.objects.bulk_update(to_update, [*ADDRESS_FIELDS, "tracked_to"], batch_size=DB_BATCH_SIZE)
         result.updated = len(to_update)
         result.unchanged = len(existing) - len(to_update)
 
@@ -350,7 +346,7 @@ def load_addresses(
                 for aid, fields in by_id.items()
                 if aid not in existing
             ],
-            batch_size=BATCH_SIZE,
+            batch_size=DB_BATCH_SIZE,
         )
         result.created = len(created)
 

@@ -11,6 +11,8 @@ from typing import Any
 
 from django.conf import settings
 
+from wuixpose.core.constants import STORAGE_SRID
+
 logger = logging.getLogger(__name__)
 
 FetchJson = Callable[[str, dict[str, str]], dict[str, Any]]
@@ -48,7 +50,7 @@ def _filter_params(where: str, bbox: tuple[float, float, float, float] | None) -
         params |= {
             "geometry": ",".join(str(v) for v in bbox),
             "geometryType": "esriGeometryEnvelope",
-            "inSR": "4326",
+            "inSR": str(STORAGE_SRID),
             "spatialRel": "esriSpatialRelIntersects",
         }
     return params
@@ -76,10 +78,10 @@ def iter_features(
     check_count: bool = False,
     fetch: FetchJson = fetch_json,
 ) -> Iterator[dict[str, Any]]:
-    """Yield GeoJSON features (lon/lat, SRID 4326) from a layer, paging by OBJECTID.
+    """Yield GeoJSON features (lon/lat, STORAGE_SRID) from a layer, paging by OBJECTID.
 
     bbox is (min_lon, min_lat, max_lon, max_lat) and keeps features that intersect it.
-    The server reprojects to 4326 itself (outSR), so no client-side transform is needed.
+    The server reprojects to STORAGE_SRID itself (outSR), so no client-side transform is needed.
 
     With check_count, the server's count is fetched first and ArcGISError raised after the last
     page if the pages didn't add up to it. Paging ends at the first empty or final-looking page, so
@@ -90,7 +92,7 @@ def iter_features(
     params = _filter_params(where, bbox) | {
         "outFields": ",".join(out_fields),
         "returnGeometry": "true",
-        "outSR": "4326",
+        "outSR": str(STORAGE_SRID),
         "f": "geojson",
         # A stable order is required for offset paging to neither skip nor repeat rows.
         "orderByFields": "OBJECTID",

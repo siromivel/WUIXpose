@@ -12,6 +12,7 @@ from django.contrib.gis.geos import Point
 from django.core.management import call_command
 
 from wuixpose.core import zones
+from wuixpose.core.constants import M_PER_FT
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import JobRun, Structure, Zone
 
@@ -37,7 +38,7 @@ def zone_geoms(structure) -> dict:
 
 def feet_from(footprint, ring) -> list[float]:
     """How far each vertex of a (projected) linear ring is from a (projected) footprint."""
-    return [footprint.distance(Point(x, y, srid=UTM_13N)) / zones.M_PER_FT for x, y in ring.coords]
+    return [footprint.distance(Point(x, y, srid=UTM_13N)) / M_PER_FT for x, y in ring.coords]
 
 
 # Geometry

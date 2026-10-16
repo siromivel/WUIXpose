@@ -8,9 +8,8 @@ from dataclasses import dataclass
 
 from django.db import connection, transaction
 
+from wuixpose.core.constants import M_PER_FT
 from wuixpose.core.models import JobRun
-
-M_PER_FT = 0.3048
 
 
 @dataclass(frozen=True)
@@ -58,7 +57,7 @@ _CHANGED_CANDIDATES = """
 _ALL_CANDIDATES = "SELECT id FROM core_structure"
 
 # Buffering as geography takes distances in meters: PostGIS buffers in a projection local to each
-# footprint and brings the result back to 4326. Buffers are rounded at corners, so a ring's edge
+# footprint and brings the result back to STORAGE_SRID. Buffers are rounded at corners, so a ring's edge
 # is everywhere the same distance from the footprint, and a ring's outer edge is the next ring's
 # inner edge exactly, both being the same buffer of the same footprint.
 _BUILD = """

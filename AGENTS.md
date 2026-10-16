@@ -59,13 +59,13 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 
 ## Geospatial (PostGIS / GeoDjango)
 - Geometries are stored in SRID 4326 as (lon, lat), not (lat, lon). Use the `STORAGE_SRID`
-  constant from `core/models/tracts.py`; don't hardcode 4326.
+  constant from `core/constants.py`; don't hardcode 4326 (or any SRID), in Python or SQL.
 - Never buffer or measure directly on stored geometries; their units are degrees.
   - Distances and buffers: cast to `geography`, which works in meters (as `core/zones.py` does).
-  - Areas: transform to equal-area EPSG:5070 (as `core/api.py` does).
+  - Areas: transform to equal-area `EQUAL_AREA_SRID` (EPSG:5070, as `core/api.py` does).
   - Tests can verify distances in UTM 13N (EPSG:32613), as `test_zones.py` does.
 - Keep spatial filters index-friendly: `ST_DWithin` rather than `ST_Distance < x`, and transform
-  the query shape (e.g. a tile envelope) to 4326 rather than transforming every row
+  the query shape (e.g. a tile envelope) to `STORAGE_SRID` rather than transforming every row
   (as `core/tiles.py` does).
 - Zone rings live in `RINGS` in `core/zones.py`. Changing them means bumping `RULE_VERSION`.
 - Tile layers are defined in `LAYERS` in `core/tiles.py`. The frontend reads each layer's
@@ -88,6 +88,15 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `search.py`,
   `display.py`, `ingest/`.
   Add a new module for a new feature rather than growing an unrelated one.
+- Imports follow layers: `constants.py` → `models/` → services → `api.py`, `tiles.py`, `views.py`
+  and commands. Import only from layers below, never above, so modules can't form import cycles
+  (`test_layering.py` enforces this).
+  - `constants.py` imports nothing from `wuixpose`. Values shared across layers (SRIDs, unit
+    conversions, batch sizes, data credits) go there. Values one module owns stay in that module
+    (`RINGS`, `boulder.COUNTY_FIPS`).
+  - Models import only `constants.py` and each other, never a service, not even for `__str__`.
+  - Deployment settings that differ between environments go in settings/env instead, never
+    domain facts that must match stored data (an SRID, a ring distance).
 - Use the ORM. Raw SQL only when GeoDjango can't express a PostGIS query,
   and always parameterized, never string-formatted.
 - Avoid N+1 queries: use `select_related` / `prefetch_related` when iterating relations.

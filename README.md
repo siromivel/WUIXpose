@@ -193,6 +193,7 @@ mise run frontend-test     # frontend tests (Vitest)
 src/wuixpose/
   config/   settings, URLs, ASGI/WSGI
   core/     models (tracts, structures, addresses, zones), migrations
+    constants.py  SRIDs, unit conversions and other values shared across modules
     ingest/   ArcGIS REST client, geometry cleanup, Boulder County loaders
     zones.py  ring definitions and the job that draws them
     tiles.py  vector tiles

@@ -13,14 +13,10 @@ from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .constants import EQUAL_AREA_SRID, SQ_FT_PER_SQ_M, SQ_M_PER_ACRE
 from .display import address_line1, address_line2
 from .models import Address, Structure, Tract
 from .search import search_addresses
-
-# NAD83 / CONUS Albers, an equal-area projection in meters, for measuring areas in the US.
-EQUAL_AREA_SRID = 5070
-SQ_M_PER_ACRE = 4046.8564224
-SQ_FT_PER_SQ_M = 10.763910417
 
 
 def area_sq_m(geom: GEOSGeometry) -> float:

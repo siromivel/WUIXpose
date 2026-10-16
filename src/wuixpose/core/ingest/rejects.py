@@ -7,11 +7,10 @@ from typing import Any
 
 from django.utils import timezone
 
+from wuixpose.core.constants import DB_BATCH_SIZE
 from wuixpose.core.models import RejectedFeature
 
 logger = logging.getLogger(__name__)
-
-BATCH_SIZE = 2000
 
 
 def reject(
@@ -49,5 +48,5 @@ def record(rejected: list[RejectedFeature]) -> None:
         update_conflicts=True,
         unique_fields=("layer", "feature_hash"),
         update_fields=("source_id", "reason", "detail", "last_seen_at"),
-        batch_size=BATCH_SIZE,
+        batch_size=DB_BATCH_SIZE,
     )

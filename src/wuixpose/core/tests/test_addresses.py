@@ -3,10 +3,11 @@ from datetime import date
 import pytest
 from django.contrib.gis.geos import Point
 
+from wuixpose.core.constants import STORAGE_SRID
 from wuixpose.core.ingest import boulder
 from wuixpose.core.ingest.geometry import point_from_geojson
 from wuixpose.core.models import Address, RejectedFeature
-from wuixpose.core.models.tracts import STORAGE_SRID, TractIdentifier
+from wuixpose.core.models.tracts import TractIdentifier
 
 from .factories import ORIGIN, address_props, box, feature, point_feature
 

@@ -5,9 +5,7 @@ from django.contrib.postgres.indexes import GinIndex
 from django.db.models import F, Q
 from django.utils import timezone
 
-from wuixpose.core.display import address_line1
-
-from .tracts import STORAGE_SRID
+from wuixpose.core.constants import STORAGE_SRID
 
 
 class AddressQuerySet(models.QuerySet["Address"]):
@@ -97,4 +95,5 @@ class Address(models.Model):
         )
 
     def __str__(self) -> str:
-        return address_line1(self)
+        # As stored, not as displayed: models don't import services (display.py formats it).
+        return " ".join(part for part in (self.number, self.street, self.unit) if part)

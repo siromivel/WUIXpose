@@ -11,6 +11,8 @@ htmlcov/
 
 mise.local.toml
 mise.*.local.toml
-.claude
+# Share only the project's Claude Code settings; personal ones go in .claude/settings.local.json.
+.claude/*
+!.claude/settings.json
 
 .DS_Store

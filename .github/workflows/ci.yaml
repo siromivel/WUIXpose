@@ -41,6 +41,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # The environments pre-commit builds for the hook repos in .pre-commit-config.yaml. They're
+      # virtualenvs on mise's Python, so a Python bump in mise.toml has to rebuild them.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml', 'mise.toml') }}
+
+      - name: File hygiene and config checks
+        run: mise run hooks
+
       - name: Lint
         run: mise run lint
 

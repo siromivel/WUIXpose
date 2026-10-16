@@ -6,10 +6,11 @@ python = "3.15.0"
 # Run `mise tasks` to list them.
 
 [tasks.setup]
-description = "Install Python and frontend dependencies"
+description = "Install Python and frontend dependencies, and the git hooks"
 run = [
   "uv sync",
   "npm --prefix frontend ci",
+  "uv run pre-commit install",  # hook types from .pre-commit-config.yaml
 ]
 
 [tasks.db]
@@ -35,8 +36,22 @@ dir = "{{config_root}}/frontend"
 run = "npm run dev"
 
 [tasks.lint]
-description = "Lint Python"
-run = "uv run ruff check"
+description = "Lint Python and check its formatting"
+run = [
+  "uv run ruff check",
+  "uv run ruff format --check",
+]
+
+[tasks.format]
+description = "Apply Python's safe lint fixes, and format Python and the frontend"
+run = [
+  # Fixes what it safely can and leaves reporting the rest to lint, so this stays the one task
+  # that changes files and lint stays a check, in CI and locally alike. Fix before formatting,
+  # since a fix can leave code the formatter would change.
+  "uv run ruff check --fix-only",
+  "uv run ruff format",
+  "npm --prefix frontend run format",
+]
 
 [tasks.typecheck]
 description = "Type-check Python"
@@ -56,10 +71,11 @@ depends = ["db"]
 run = "uv run pytest"
 
 [tasks.frontend-check]
-description = "Lint, type-check and bundle the frontend"
+description = "Lint, format-check, type-check and bundle the frontend"
 dir = "{{config_root}}/frontend"
 run = [
   "npm run lint",
+  "npm run format:check",
   "npm run build",  # tsc -b, then vite build
 ]
 
@@ -68,6 +84,15 @@ description = "Run the frontend tests"
 dir = "{{config_root}}/frontend"
 run = "npm test"
 
+[tasks.hooks]
+description = "Check file hygiene and config files (the git hooks the other checks don't cover)"
+# The skipped hooks are the tasks CI runs on their own (formatting it checks with lint and
+# frontend-check), and no-commit-to-branch is about where you commit, not what's in the files.
+env = { SKIP = "no-commit-to-branch,format,lint,typecheck,frontend-check" }
+run = "uv run pre-commit run --all-files --show-diff-on-failure"
+
 [tasks.check]
 description = "Everything CI runs"
-depends = ["lint", "typecheck", "migrations-check", "test", "frontend-check", "frontend-test"]
+depends = [
+  "hooks", "lint", "typecheck", "migrations-check", "test", "frontend-check", "frontend-test",
+]

@@ -20,14 +20,21 @@ something behaves, update the README in the same change.
 ## Commands
 Use mise tasks (`mise tasks` lists them). They run from the right directory and start the
 database when they need it.
-- Setup: `mise install`, then `mise run setup`
+- Setup: `mise install`, then `mise run setup` (also installs the git hooks)
 - Database only: `mise run db`; migrations: `mise run migrate`
 - Dev servers: `mise run dev` (Django, :8000) and `mise run dev-frontend` (map UI, :5173)
-- Before every commit: `mise run check` (everything CI runs)
-- Individual checks: `mise run lint`, `typecheck`, `migrations-check`, `test`, `frontend-check`,
-  `frontend-test`
+- Before every commit: `mise run check` (everything CI runs). The pre-commit and pre-push hooks
+  (`.pre-commit-config.yaml`) run most of it; never skip them with `--no-verify`.
+- Individual checks: `mise run hooks`, `lint`, `typecheck`, `migrations-check`, `test`,
+  `frontend-check`, `frontend-test`
+- Format: `mise run format` (ruff's safe lint fixes, then ruff and oxfmt). A hook that reformats or fixes files fails the
+  commit; stage its changes and commit again. In Claude Code, a hook in `.claude/settings.json`
+  formats each file after you edit it, so don't format by hand.
 - CI runs these same tasks. To add a check, add a mise task and call it from
-  `.github/workflows/ci.yaml`; don't inline commands in the workflow.
+  `.github/workflows/ci.yaml`; don't inline commands in the workflow. If it should also run as a
+  git hook, add a `local` hook with `entry: mise run <task>` and the task's name as its id (never
+  the tool's command directly, or a hook repo with its own pinned copy), and add that id to the
+  `hooks` task's `SKIP` so CI doesn't run it twice.
 
 One-off commands:
 - `manage.py` lives in `src/wuixpose`, so run `uv run python manage.py <command>` from there.
@@ -80,6 +87,8 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Comments explain *why*, not *what*.
 - Never commit secrets, credentials or `.env` files.
 - Small, focused commits with descriptive messages.
+- If you find yourself repeating a manual check or fix, propose automating it as a mise task or
+  git hook rather than continuing by hand.
 
 ### Python / Django
 - Follow PEP 8 naming. Ruff lints (`mise run lint`); pyright checks types (`mise run typecheck`).

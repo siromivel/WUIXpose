@@ -164,6 +164,47 @@ code {
   font-size: 12px;
 }
 
+.search input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.search input:focus {
+  outline: 2px solid var(--link);
+  outline-offset: -1px;
+}
+
+.search > p {
+  margin-top: 8px;
+}
+
+.results {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.results li {
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.results li[aria-selected='true'] {
+  background: #eef1f4;
+}
+
+.results .line2 {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .card dl {
   display: grid;
   grid-template-columns: auto 1fr;

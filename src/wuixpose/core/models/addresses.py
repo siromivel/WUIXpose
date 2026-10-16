@@ -2,6 +2,7 @@ import re
 from typing import ClassVar, Self
 
 from django.contrib.gis.db import models
+from django.contrib.postgres.indexes import GinIndex
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -64,6 +65,9 @@ class Address(models.Model):
     jurisdiction = models.CharField(max_length=64, blank=True)
     state = models.CharField(max_length=2)
     zip_code = models.CharField(max_length=5, blank=True)
+    # Number, street, unit and jurisdiction, normalized for search (search.address_search_text).
+    # Derived; written at ingest along with the fields it comes from.
+    search_text = models.TextField(blank=True, default="")
 
     # The parcel the source says the address is on, matched against TractIdentifier to find the
     # tract. Kept as published, so a parcel number we don't track yet can match later.
@@ -104,6 +108,15 @@ class Address(models.Model):
             models.CheckConstraint(
                 condition=Q(tracked_to__isnull=True) | Q(tracked_to__gte=F("tracked_from")),
                 name="address_tracked_range",
+            ),
+        )
+        indexes = (
+            # Trigram matching for search, which only ever looks at current addresses.
+            GinIndex(
+                fields=["search_text"],
+                opclasses=["gin_trgm_ops"],
+                condition=Q(tracked_to__isnull=True),
+                name="address_search_trgm",
             ),
         )
 

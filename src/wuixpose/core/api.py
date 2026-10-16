@@ -1,4 +1,4 @@
-"""Read-only JSON for the map: what's loaded, and details for a clicked tract or structure.
+"""Read-only JSON for the map: what's loaded, details for a clicked tract or structure, and search.
 
 Shapes themselves go to the map as vector tiles (see tiles.py); these endpoints carry the
 attributes a popup or side panel needs.
@@ -14,6 +14,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import Address, Structure, Tract
+from .search import search_addresses
 
 # NAD83 / CONUS Albers, an equal-area projection in meters, for measuring areas in the US.
 EQUAL_AREA_SRID = 5070
@@ -108,8 +109,22 @@ def tract_detail(request, pk: int):
 
 @api_view(["GET"])
 def structure_detail(request, pk: int):
-    structure = get_object_or_404(Structure.objects.prefetch_related("tract__identifiers"), pk=pk)
+    structure = get_object_or_404(
+        Structure.objects.select_related("tract").prefetch_related("tract__identifiers"), pk=pk
+    )
     return Response(StructureSerializer(structure).data)
+
+
+class SearchResultSerializer(AddressSerializer):
+    class Meta(AddressSerializer.Meta):
+        fields = (*AddressSerializer.Meta.fields, "tract")
+
+
+@api_view(["GET"])
+def search(request):
+    """Current addresses best matching ?q=, best first. Empty for a missing or too-short query."""
+    results = search_addresses(request.query_params.get("q", ""))
+    return Response({"results": SearchResultSerializer(results, many=True).data})
 
 
 @api_view(["GET"])

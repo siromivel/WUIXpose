@@ -14,7 +14,8 @@ run = [
 
 [tasks.db]
 description = "Start Postgres/PostGIS and Redis"
-run = "docker compose up -d"
+# --wait returns once the healthchecks pass, so tasks that depend on this can connect right away.
+run = "docker compose up -d --wait"
 
 [tasks.migrate]
 description = "Apply database migrations"
@@ -44,4 +45,29 @@ run = "uv run pyright"
 [tasks.migrations-check]
 description = "Fail if models and migrations are out of sync"
 dir = "{{config_root}}/src/wuixpose"
+# Not strictly needed, but without a database makemigrations warns that it can't check the
+# applied migration history.
+depends = ["db"]
 run = "uv run python manage.py makemigrations --check --dry-run"
+
+[tasks.test]
+description = "Run the Python tests"
+depends = ["db"]
+run = "uv run pytest"
+
+[tasks.frontend-check]
+description = "Lint, type-check and bundle the frontend"
+dir = "{{config_root}}/frontend"
+run = [
+  "npm run lint",
+  "npm run build",  # tsc -b, then vite build
+]
+
+[tasks.frontend-test]
+description = "Run the frontend tests"
+dir = "{{config_root}}/frontend"
+run = "npm test"
+
+[tasks.check]
+description = "Everything CI runs"
+depends = ["lint", "typecheck", "migrations-check", "test", "frontend-check", "frontend-test"]

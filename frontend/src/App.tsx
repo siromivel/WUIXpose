@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import { type Summary, fetchSummary, fetchTileJson } from './api'
+import { type SearchResult, type Summary, fetchSummary, fetchTileJson } from './api'
 import { type LayerVisibility, type Selection, TILE_LAYERS, type TileSources } from './layers'
-import { MapView } from './MapView'
+import { type Focus, MapView } from './MapView'
 import { Panel } from './Panel'
 
 // What the map needs before it can be built: where the data is, and how its tiles are served.
@@ -26,6 +26,14 @@ export default function App() {
   const [visible, setVisible] = useState<LayerVisibility>({ tracts: true, structures: true, zones: true, imagery: false })
   const [selection, setSelection] = useState<Selection>(null)
   const [zoom, setZoom] = useState(0)
+  const [focus, setFocus] = useState<Focus | null>(null)
+
+  // Go to a searched address and select its lot. One without a lot clears the selection rather
+  // than leave a lot elsewhere selected.
+  function pickAddress(result: SearchResult) {
+    setFocus({ lon: result.lon, lat: result.lat })
+    setSelection(result.tract === null ? null : { kind: 'tract', id: result.tract })
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -48,12 +56,14 @@ export default function App() {
         onToggle={(layer) => setVisible((v) => ({ ...v, [layer]: !v[layer] }))}
         selection={selection}
         onSelect={setSelection}
+        onPickAddress={pickAddress}
       />
       {mapData && (
         <MapView
           initialBbox={mapData.summary.bbox}
           tileSources={mapData.tileSources}
           visible={visible}
+          focus={focus}
           selection={selection}
           onSelect={setSelection}
           onZoom={setZoom}

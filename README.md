@@ -67,6 +67,33 @@ Addresses carry the county's jurisdiction ("Unincorporated Boulder County", "Lon
 USPS mailing city, which the county layer doesn't publish: a Gold Hill address shows as
 unincorporated though its mail goes to Boulder.
 
+### Address search
+
+`/api/search/?q=` finds current addresses from what a person types, tolerating typos, partial input
+and different spellings. Each address stores a `search_text`: its number, street, unit,
+jurisdiction, state and ZIP, normalized (`core/search.py`). Queries are normalized the same way, so
+"South Boulder Road" and "S BOULDER RD" are the same words on both sides:
+
+- Spelled-out directionals, street types and ordinals become the county's abbreviations ("NORTH" →
+  "N", "AVENUE" → "AVE", "SECOND" → "2ND"), as do "MOUNT", "SAINT" and "FORT". "CR" becomes
+  "COUNTY RD".
+- Unit designators are dropped, so "#206", "APT 206", "UNIT 206" and "STE 206" all match.
+- Apostrophes and periods are removed and other punctuation splits words.
+
+The word table and its test cases (`core/tests/test_search.py`) are the spec. Matching is
+Postgres trigram word similarity (`pg_trgm`, GIN-indexed), with a boost for addresses whose house
+number starts with the number typed. Queries under three characters return nothing. The ingest
+writes `search_text` and rewrites it whenever it differs, so a change to the normalization reaches
+stored addresses on the next ingest. A bounding-box ingest only reaches addresses in its box.
+
+The jurisdiction is in `search_text`, so a mailing city can still match: "1172 Valley Ln, Boulder,
+CO 80302" finds the unincorporated address. A side effect is that "boulder" matches most of the
+county, which makes broad queries like "south boulder road" take a few hundred milliseconds
+instead of one or two.
+
+The county has a few addresses that are exact duplicates (separate address points with the same
+number, street, unit and parcel). Search returns each of them.
+
 ## Stack
 
 Python, Django 5.2 with GeoDjango, Django REST Framework, PostgreSQL 17 + PostGIS and Redis,
@@ -91,8 +118,8 @@ mise run dev             # Django on :8000
 
 Check that it's up: `curl localhost:8000/health/` should return `{"status": "ok"}`.
 
-`mise tasks` lists every task. Tasks that need the database (`dev`, `migrate`, `test`) start it
-first; `mise run db` starts it on its own.
+`mise tasks` lists every task. Tasks that need the database (`dev`, `migrate`, `migrations-check`,
+`test`) start it first and wait until it's healthy; `mise run db` starts it on its own.
 
 Load map data (in another terminal, from `src/wuixpose`). The whole county takes a while; a bounding box (WGS 84
 `min_lon,min_lat,max_lon,max_lat`) loads one area, for example around Gold Hill and Sunshine
@@ -109,7 +136,8 @@ Then start the map UI, which proxies `/api` and `/tiles` to Django on :8000:
 mise run dev-frontend    # http://localhost:5173
 ```
 
-Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15.
+Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15. The search box in
+the panel finds an address, flies the map there and selects its lot.
 
 ## API
 
@@ -120,9 +148,14 @@ Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15.
 | `/api/summary/` | Counts and the bounding box of loaded tracts |
 | `/api/tracts/<id>/` | Addresses, county parcel numbers, acreage, structure ids |
 | `/api/structures/<id>/` | Source ID, tract and its addresses and county parcel numbers, footprint square feet |
+| `/api/search/?q=` | Up to 10 current addresses best matching `q`, best first, each with its point and tract (see [Address search](#address-search)) |
 
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
 frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`.
+
+The frontend checks every response against its expected shape before using it (`frontend/src/api.ts`,
+built from the checks in `frontend/src/validate.ts`). A response that doesn't match fails with a
+message naming the field, rather than breaking somewhere later in the UI.
 
 ## Configuration
 
@@ -142,14 +175,16 @@ defaults.
 ## Checks
 
 `mise run check` runs everything CI runs on every push to `main` and every pull request. Each
-check is also its own task:
+check is also its own task, and CI runs these same tasks, starting the database from
+`compose.yaml` as local development does:
 
 ```bash
 mise run lint              # Python lint (ruff)
 mise run typecheck         # Python types (pyright)
-mise run migrations-check  # migrations match models
+mise run migrations-check  # migrations match models (starts the database)
 mise run test              # Python tests (starts the database)
 mise run frontend-check    # frontend lint, types and bundle
+mise run frontend-test     # frontend tests (Vitest)
 ```
 
 ## Layout
@@ -161,6 +196,7 @@ src/wuixpose/
     ingest/   ArcGIS REST client, geometry cleanup, Boulder County loaders
     zones.py  ring definitions and the job that draws them
     tiles.py  vector tiles
+    search.py address normalization and search
     api.py    JSON endpoints
 frontend/   React + MapLibre map UI
 ```

@@ -29,6 +29,7 @@ from wuixpose.core.ingest.geometry import (
 )
 from wuixpose.core.models import Address, JobRun, RejectedFeature, Structure, Tract
 from wuixpose.core.models.tracts import TractIdentifier
+from wuixpose.core.search import address_search_text
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,8 @@ def _address_fields(props: dict[str, Any]) -> dict[str, Any] | None:
     if jurisdiction == "UNINCORPORATED":
         jurisdiction = "UNINCORPORATED BOULDER COUNTY"
     zip_code = _text(props, "ZIPCODE")
+    if not re.fullmatch(r"\d{5}", zip_code):  # also holds " " and "0"
+        zip_code = ""
     apn = _text(props, "PARCEL_NUMBER")
     return {
         "number": number,
@@ -239,13 +242,27 @@ def _address_fields(props: dict[str, Any]) -> dict[str, Any] | None:
         "unit": unit,
         "jurisdiction": jurisdiction,
         "state": "CO",
-        "zip_code": zip_code if re.fullmatch(r"\d{5}", zip_code) else "",  # also holds " " and "0"
+        "zip_code": zip_code,
         "county_fips": COUNTY_FIPS if apn else None,
         "county_apn": apn or None,
+        "search_text": address_search_text(number, street, unit, jurisdiction, "CO", zip_code),
     }
 
 
-ADDRESS_FIELDS = ("geom", "number", "street", "unit", "jurisdiction", "state", "zip_code", "county_fips", "county_apn")
+# search_text is compared like the rest, so a change to its normalization rewrites the affected
+# addresses on the next load.
+ADDRESS_FIELDS = (
+    "geom",
+    "number",
+    "street",
+    "unit",
+    "jurisdiction",
+    "state",
+    "zip_code",
+    "county_fips",
+    "county_apn",
+    "search_text",
+)
 
 
 def _matches(address: Address, fields: dict[str, Any]) -> bool:

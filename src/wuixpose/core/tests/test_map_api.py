@@ -202,6 +202,13 @@ def test_structure_detail(client, loaded):
 
 
 @pytest.mark.django_db
+def test_structure_detail_queries(client, loaded, django_assert_num_queries):
+    # The structure with its tract, the tract's identifiers, and its addresses.
+    with django_assert_num_queries(3):
+        client.get(reverse("structure-detail", args=[loaded["structure"].pk]))
+
+
+@pytest.mark.django_db
 def test_structure_detail_without_a_tract(client):
     boulder.load_structures([feature({"StructureID": "S"}, box(0.0002, 0.0002, 0.0004, 0.0003))])
 

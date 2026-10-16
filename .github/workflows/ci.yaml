@@ -10,30 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Checks run as the same mise tasks as locally (mise.toml); `mise run check` runs them all. They're
+# split over two jobs here so the backend and frontend run in parallel.
 jobs:
   backend:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
-    services:
-      # Same image as compose.yaml, so CI and local dev run the same Postgres and PostGIS.
-      db:
-        image: imresamu/postgis:17-3.5-alpine
-        env:
-          POSTGRES_DB: wuixpose
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d wuixpose"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     env:
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: "5432"
       # Settings refuse to load without a key when DEBUG is off, which it is here.
       DJANGO_SECRET_KEY: ci-only-not-secret
       # Use the Python that mise installs from mise.toml; fail rather than let uv download another.
@@ -48,8 +32,6 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends gdal-bin
 
       - uses: jdx/mise-action@v5
-        with:
-          install_args: python
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -60,31 +42,26 @@ jobs:
         run: uv sync --locked
 
       - name: Lint
-        run: uv run ruff check
+        run: mise run lint
 
       - name: Type check
-        run: uv run pyright
+        run: mise run typecheck
 
+      # This and the tests start Postgres/PostGIS and Redis from compose.yaml, as they do locally.
       - name: Check for missing migrations
-        working-directory: src/wuixpose
-        run: uv run python manage.py makemigrations --check --dry-run
+        run: mise run migrations-check
 
       - name: Test
-        run: uv run pytest
+        run: mise run test
 
   frontend:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: frontend
 
     steps:
       - uses: actions/checkout@v5
 
       - uses: jdx/mise-action@v5
-        with:
-          install_args: node
 
       # mise doesn't cache npm's download cache the way setup-node did.
       - uses: actions/cache@v6
@@ -94,11 +71,11 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
 
       - name: Install dependencies
+        working-directory: frontend
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint, type-check and bundle
+        run: mise run frontend-check
 
-      # Type-checks (tsc -b) and then bundles.
-      - name: Build
-        run: npm run build
+      - name: Test
+        run: mise run frontend-test

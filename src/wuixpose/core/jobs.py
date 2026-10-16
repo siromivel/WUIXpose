@@ -40,8 +40,13 @@ def incremental_run(job: JobRun.Job, *, full: bool = False) -> Generator[Increme
         since = (
             None
             if full
-            else JobRun.objects.filter(job=job).order_by("-started_at").values_list("started_at", flat=True).first()
+            else JobRun.objects.filter(job=job)
+            .order_by("-started_at")
+            .values_list("started_at", flat=True)
+            .first()
         )
         run = IncrementalRun(cursor=cursor, since=since)
         yield run
-        JobRun.objects.create(job=job, started_at=started_at, full=run.full, rows_changed=run.rows_changed)
+        JobRun.objects.create(
+            job=job, started_at=started_at, full=run.full, rows_changed=run.rows_changed
+        )

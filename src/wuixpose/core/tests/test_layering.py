@@ -12,7 +12,12 @@ import pytest
 CORE = Path(__file__).resolve().parent.parent
 SRC = CORE.parent.parent
 # What serves requests or runs commands. Nothing below it may import it.
-TOP = ("wuixpose.core.api", "wuixpose.core.tiles", "wuixpose.core.views", "wuixpose.core.management")
+TOP = (
+    "wuixpose.core.api",
+    "wuixpose.core.tiles",
+    "wuixpose.core.views",
+    "wuixpose.core.management",
+)
 
 
 def _module(path: Path) -> str:

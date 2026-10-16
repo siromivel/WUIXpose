@@ -61,7 +61,10 @@ def test_address_search_text_is_the_whole_address_normalized():
 def load(*addresses: tuple[str, str, str, dict]) -> None:
     """Load addresses given as (id, number, street name, other county fields), all at ORIGIN."""
     boulder.load_addresses(
-        [point_feature(address_props(aid, number, street, **extra), 0, 0) for aid, number, street, extra in addresses]
+        [
+            point_feature(address_props(aid, number, street, **extra), 0, 0)
+            for aid, number, street, extra in addresses
+        ]
     )
 
 
@@ -138,7 +141,9 @@ def test_equal_matches_are_in_street_and_numeric_order():
 def test_a_house_number_matching_from_the_start_ranks_first():
     # By trigrams alone 2117 matches "117" better, but someone typing "117" may be on their way
     # to 1172.
-    load(("1", "2117", "VALLEY", {"STREETTYPE": "LN"}), ("2", "1172", "VALLEY", {"STREETTYPE": "LN"}))
+    load(
+        ("1", "2117", "VALLEY", {"STREETTYPE": "LN"}), ("2", "1172", "VALLEY", {"STREETTYPE": "LN"})
+    )
 
     assert found("117 valley") == ["1172 Valley Ln", "2117 Valley Ln"]
 
@@ -148,7 +153,10 @@ def test_a_house_number_matching_from_the_start_ranks_first():
 
 @pytest.mark.django_db
 def test_loading_writes_search_text(addresses):
-    assert Address.objects.get(source_id="1").search_text == "1172 VALLEY LN UNINCORPORATED BOULDER COUNTY CO 80302"
+    assert (
+        Address.objects.get(source_id="1").search_text
+        == "1172 VALLEY LN UNINCORPORATED BOULDER COUNTY CO 80302"
+    )
 
 
 @pytest.mark.django_db
@@ -171,7 +179,13 @@ def test_reloading_rewrites_stale_search_text():
 def test_search_api(client):
     boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))])
     boulder.load_addresses(
-        [point_feature(address_props("1", "1172", "VALLEY", "A", STREETTYPE="LN", ZIPCODE="80302"), 0.0005, 0.0005)]
+        [
+            point_feature(
+                address_props("1", "1172", "VALLEY", "A", STREETTYPE="LN", ZIPCODE="80302"),
+                0.0005,
+                0.0005,
+            )
+        ]
     )
     assignment.link_address_tracts()
     address = Address.objects.get()

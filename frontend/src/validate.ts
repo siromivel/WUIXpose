@@ -36,7 +36,9 @@ export const optional =
 export const array =
   <T>(check: Check<T>): Check<T[]> =>
   (value, path) =>
-    Array.isArray(value) ? value.map((item, i) => check(item, at(path, i))) : fail(path, 'an array', value)
+    Array.isArray(value)
+      ? value.map((item, i) => check(item, at(path, i)))
+      : fail(path, 'an array', value)
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -47,16 +49,21 @@ export const record =
   <T>(check: Check<T>): Check<Record<string, T>> =>
   (value, path) =>
     isObject(value)
-      ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, check(item, at(path, key))]))
+      ? Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, check(item, at(path, key))]),
+        )
       : fail(path, 'an object', value)
 
 // An object with the keys in `shape`. Keys not in the shape are dropped, so code only sees what
 // was checked.
-export function object<S extends Record<string, Check<unknown>>>(shape: S): Check<{ [K in keyof S]: Checked<S[K]> }> {
+export function object<S extends Record<string, Check<unknown>>>(
+  shape: S,
+): Check<{ [K in keyof S]: Checked<S[K]> }> {
   return (value, path) => {
     if (!isObject(value)) return fail(path, 'an object', value)
     const checked: Record<string, unknown> = {}
-    for (const [key, check] of Object.entries(shape)) checked[key] = check(value[key], at(path, key))
+    for (const [key, check] of Object.entries(shape))
+      checked[key] = check(value[key], at(path, key))
     // Every key in the shape was checked just above, which TypeScript can't follow through the loop.
     return checked as { [K in keyof S]: Checked<S[K]> }
   }

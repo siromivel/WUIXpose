@@ -26,7 +26,9 @@ def geom_updated_at(model, pk):
 def set_tract_without_touching_geometry(structure_id, tract_id):
     """A write the assignment job can't see: no geometry changed, so nothing marks it."""
     with connection.cursor() as cursor:
-        cursor.execute("UPDATE core_structure SET tract_id = %s WHERE id = %s", [tract_id, structure_id])
+        cursor.execute(
+            "UPDATE core_structure SET tract_id = %s WHERE id = %s", [tract_id, structure_id]
+        )
 
 
 def tract_of():
@@ -49,7 +51,9 @@ def test_geom_updated_at_moves_only_when_geometry_changes():
     stamped = geom_updated_at(Tract, tract.pk)
 
     # bulk_update rewrites the column even when the value is identical, as ingests do.
-    Tract.objects.bulk_update([Tract(pk=tract.pk, geom=multipolygon(box(0, 0, 0.001, 0.001)))], ["geom"])
+    Tract.objects.bulk_update(
+        [Tract(pk=tract.pk, geom=multipolygon(box(0, 0, 0.001, 0.001)))], ["geom"]
+    )
     assert geom_updated_at(Tract, tract.pk) == stamped
 
     Tract.objects.filter(pk=tract.pk).update(geom=multipolygon(box(0, 0, 0.002, 0.001)))
@@ -62,7 +66,9 @@ def test_values_written_from_python_are_ignored():
     stamped = geom_updated_at(Tract, tract.pk)
 
     with connection.cursor() as cursor:
-        cursor.execute("UPDATE core_tract SET geom_updated_at = '2000-01-01' WHERE id = %s", [tract.pk])
+        cursor.execute(
+            "UPDATE core_tract SET geom_updated_at = '2000-01-01' WHERE id = %s", [tract.pk]
+        )
 
     assert geom_updated_at(Tract, tract.pk) == stamped
 
@@ -140,7 +146,9 @@ def test_a_moved_structure_is_picked_up():
     load_two_lots_and_structures()
     assignment.assign_structure_tracts()
 
-    boulder.load_structures([feature({"StructureID": "between"}, box(0.0022, 0.0003, 0.0023, 0.0004))])
+    boulder.load_structures(
+        [feature({"StructureID": "between"}, box(0.0022, 0.0003, 0.0023, 0.0004))]
+    )
     assignment.assign_structure_tracts()
 
     assert tract_of()["between"] == Tract.objects.get(identifiers__value="B").pk
@@ -185,6 +193,10 @@ def test_watermark_is_the_jobs_transaction_start():
 
     # Every structure was written before the job's transaction began.
     run = JobRun.objects.get()
-    latest_write = Structure.objects.order_by("-geom_updated_at").values_list("geom_updated_at", flat=True).first()
+    latest_write = (
+        Structure.objects.order_by("-geom_updated_at")
+        .values_list("geom_updated_at", flat=True)
+        .first()
+    )
     assert latest_write is not None
     assert run.started_at > latest_write

@@ -59,7 +59,11 @@ def test_iter_features_pages_until_server_reports_no_more():
 def test_iter_features_sends_bbox_as_envelope():
     server = FakeServer([], page_size=10)
 
-    list(arcgis.iter_features("https://gis.example/Layer/0", bbox=(-105.5, 40.0, -105.3, 40.1), fetch=server))
+    list(
+        arcgis.iter_features(
+            "https://gis.example/Layer/0", bbox=(-105.5, 40.0, -105.3, 40.1), fetch=server
+        )
+    )
 
     _, params = server.requests[0]
     assert params["geometry"] == "-105.5,40.0,-105.3,40.1"
@@ -72,7 +76,16 @@ def test_iter_features_checks_the_count_when_asked():
     server = FakeServer(features, page_size=2)
     bbox = (-105.5, 40.0, -105.3, 40.1)
 
-    got = list(arcgis.iter_features("https://gis.example/Layer/0", where="X = 1", bbox=bbox, page_size=2, check_count=True, fetch=server))
+    got = list(
+        arcgis.iter_features(
+            "https://gis.example/Layer/0",
+            where="X = 1",
+            bbox=bbox,
+            page_size=2,
+            check_count=True,
+            fetch=server,
+        )
+    )
 
     assert len(got) == 5
     _, count_params = server.requests[0]
@@ -86,7 +99,11 @@ def test_iter_features_raises_when_pages_fall_short_of_the_count():
     server = FakeServer(features, page_size=2, count=7)
 
     with pytest.raises(arcgis.ArcGISError, match="got 5 features but the server counts 7"):
-        list(arcgis.iter_features("https://gis.example/Layer/0", page_size=2, check_count=True, fetch=server))
+        list(
+            arcgis.iter_features(
+                "https://gis.example/Layer/0", page_size=2, check_count=True, fetch=server
+            )
+        )
 
 
 def test_fetch_json_raises_on_arcgis_error_body(monkeypatch):
@@ -112,7 +129,9 @@ def test_bowtie_polygon_becomes_valid_multipolygon():
 
 
 def test_non_polygonal_geometry_is_dropped():
-    assert multipolygon_from_geojson({"type": "LineString", "coordinates": [[0, 0], [1, 1]]}) is None
+    assert (
+        multipolygon_from_geojson({"type": "LineString", "coordinates": [[0, 0], [1, 1]]}) is None
+    )
     assert multipolygon_from_geojson(None) is None
 
 
@@ -145,7 +164,9 @@ def test_heights_are_dropped():
 
 
 def current_apns():
-    return dict(TractIdentifier.objects.filter(tracked_to__isnull=True).values_list("value", "tract_id"))
+    return dict(
+        TractIdentifier.objects.filter(tracked_to__isnull=True).values_list("value", "tract_id")
+    )
 
 
 @pytest.mark.django_db
@@ -195,7 +216,9 @@ def test_reloading_tracts_updates_geometry_in_place():
 
 @pytest.mark.django_db
 def test_new_identifiers_are_tracked_from_the_load_date():
-    boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))], as_of=date(2026, 10, 5))
+    boulder.load_tracts(
+        [feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))], as_of=date(2026, 10, 5)
+    )
     boulder.load_tracts([feature({"PARCEL_NO": "B"}, box(0.001, 0, 0.002, 0.001))])
 
     tracked_from = dict(TractIdentifier.objects.values_list("value", "tracked_from"))
@@ -204,9 +227,13 @@ def test_new_identifiers_are_tracked_from_the_load_date():
 
 @pytest.mark.django_db
 def test_reloading_tracts_keeps_identifier_tracked_from():
-    boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))], as_of=date(2026, 10, 5))
+    boulder.load_tracts(
+        [feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))], as_of=date(2026, 10, 5)
+    )
 
-    boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.002, 0.001))], as_of=date(2026, 10, 12))
+    boulder.load_tracts(
+        [feature({"PARCEL_NO": "A"}, box(0, 0, 0.002, 0.001))], as_of=date(2026, 10, 12)
+    )
 
     assert TractIdentifier.objects.get().tracked_from == date(2026, 10, 5)
 
@@ -255,7 +282,11 @@ def test_unusable_features_are_skipped_and_recorded(caplog):
     assert rows["unclosed"].layer == RejectedFeature.Layer.BOCO_FOOTPRINTS
     assert rows["unclosed"].feature == features[1]
     assert rows["unclosed"].detail
-    (warning,) = [r for r in caplog.records if r.name == "wuixpose.core.ingest.rejects" and r.levelno == logging.WARNING]
+    (warning,) = [
+        r
+        for r in caplog.records
+        if r.name == "wuixpose.core.ingest.rejects" and r.levelno == logging.WARNING
+    ]
     assert "unclosed" in warning.getMessage()
 
 
@@ -299,7 +330,12 @@ def test_structures_are_assigned_to_the_tract_holding_their_footprint():
     result = assignment.assign_structure_tracts()
 
     tract_of = dict(Structure.objects.values_list("source_id", "tract_id"))
-    assert tract_of == {"inside-a": apns["A"], "mostly-a": apns["A"], "straddles": None, "outside": None}
+    assert tract_of == {
+        "inside-a": apns["A"],
+        "mostly-a": apns["A"],
+        "straddles": None,
+        "outside": None,
+    }
     assert result.changed == 2
     assert assignment.assign_structure_tracts().changed == 0
 
@@ -343,7 +379,12 @@ def test_ingest_command_retires_missing_addresses_only_without_a_bbox(monkeypatc
     boulder.load_addresses([point_feature(address_props("gone", "12", "MAIN"), 0, 0)])
     monkeypatch.setattr(boulder, "fetch_addresses", lambda bbox, **kwargs: [])
 
-    call_command("ingest_boulder", "--layer=addresses", *([f"--bbox={bbox}"] if bbox else []), stdout=io.StringIO())
+    call_command(
+        "ingest_boulder",
+        "--layer=addresses",
+        *([f"--bbox={bbox}"] if bbox else []),
+        stdout=io.StringIO(),
+    )
 
     assert (Address.objects.get().tracked_to is not None) == retired
 

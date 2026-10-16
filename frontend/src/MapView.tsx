@@ -68,7 +68,12 @@ function byRing<T extends string | number>(
   fallback: T,
 ): ExpressionSpecification {
   return rings.reduceRight<ExpressionSpecification>(
-    (otherwise, ring, i) => ['case', ['==', ['get', 'ring_key'], ring.key], value(ring, i), otherwise],
+    (otherwise, ring, i) => [
+      'case',
+      ['==', ['get', 'ring_key'], ring.key],
+      value(ring, i),
+      otherwise,
+    ],
     ['literal', fallback],
   )
 }
@@ -128,7 +133,15 @@ function addDataLayers(map: MapLibreMap, tileSources: TileSources, zoneRings: Zo
     paint: {
       'line-color': ['case', selected, COLORS.tractSelected, COLORS.tract],
       // Zoom must be the outermost expression, so the selected case sits inside each stop.
-      'line-width': ['interpolate', ['linear'], ['zoom'], 12, ['case', selected, 2, 0.4], 17, ['case', selected, 3, 1.4]],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        12,
+        ['case', selected, 2, 0.4],
+        17,
+        ['case', selected, 3, 1.4],
+      ],
     },
   })
   // The shading says which zone the ground is in, so it is the same however many structures'
@@ -202,7 +215,16 @@ function featureId(selection: NonNullable<Selection>): FeatureIdentifier {
   return { source: layer, sourceLayer: layer, id: selection.id }
 }
 
-export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, selection, onSelect, onZoom }: Props) {
+export function MapView({
+  initialBbox,
+  tileSources,
+  zoneRings,
+  visible,
+  focus,
+  selection,
+  onSelect,
+  onZoom,
+}: Props) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   // Only the first values matter: they set the opening view, the sources and their styling.
@@ -235,7 +257,11 @@ export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, s
 
     let usingPlainStyle = false
     instance.on('error', (event) => {
-      if (!usingPlainStyle && !instance.loaded() && String(event.error?.message).includes(config.basemapStyle)) {
+      if (
+        !usingPlainStyle &&
+        !instance.loaded() &&
+        String(event.error?.message).includes(config.basemapStyle)
+      ) {
         console.warn('Basemap unavailable, falling back to a plain background')
         usingPlainStyle = true
         instance.setStyle(PLAIN_STYLE)
@@ -265,7 +291,10 @@ export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, s
         onSelectRef.current(null)
         return
       }
-      onSelectRef.current({ kind: hit.layer.id === 'structures-fill' ? 'structure' : 'tract', id: hit.id })
+      onSelectRef.current({
+        kind: hit.layer.id === 'structures-fill' ? 'structure' : 'tract',
+        id: hit.id,
+      })
     })
     for (const id of ['structures-fill', 'tracts-fill']) {
       instance.on('mouseenter', id, () => (instance.getCanvas().style.cursor = 'pointer'))
@@ -304,7 +333,8 @@ export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, s
 
   // Keep the zoom if already closer in.
   useEffect(() => {
-    if (map && focus) map.flyTo({ center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), FOCUS_ZOOM) })
+    if (map && focus)
+      map.flyTo({ center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), FOCUS_ZOOM) })
   }, [map, focus])
 
   return <div ref={container} className="map" />

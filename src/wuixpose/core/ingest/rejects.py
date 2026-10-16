@@ -23,8 +23,17 @@ def reject(
 ) -> RejectedFeature:
     """Log a rejected feature and return its row, unsaved; the load saves them with record()."""
     # Missing IDs and stray non-polygons are routine in county data; unreadable geometry isn't.
-    level = logging.WARNING if reason == RejectedFeature.Reason.UNREADABLE_GEOMETRY else logging.INFO
-    logger.log(level, "Rejected %s feature %s (%s) %s", layer, source_id or "without ID", reason.label, detail)
+    level = (
+        logging.WARNING if reason == RejectedFeature.Reason.UNREADABLE_GEOMETRY else logging.INFO
+    )
+    logger.log(
+        level,
+        "Rejected %s feature %s (%s) %s",
+        layer,
+        source_id or "without ID",
+        reason.label,
+        detail,
+    )
     canonical = json.dumps(feature, sort_keys=True, separators=(",", ":"))
     return RejectedFeature(
         layer=layer,

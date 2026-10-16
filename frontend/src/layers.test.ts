@@ -14,6 +14,8 @@ describe('zone presentation', () => {
 
   it('colors a ring by its key, and one it has no color for in the fallback', () => {
     expect(zoneColor({ key: 'hiz_0_5', inner_ft: 0, outer_ft: 5 })).toBe(ZONE_COLORS.hiz_0_5)
-    expect(zoneColor({ key: 'hiz_100_200', inner_ft: 100, outer_ft: 200 })).toBe(ZONE_FALLBACK_COLOR)
+    expect(zoneColor({ key: 'hiz_100_200', inner_ft: 100, outer_ft: 200 })).toBe(
+      ZONE_FALLBACK_COLOR,
+    )
   })
 })

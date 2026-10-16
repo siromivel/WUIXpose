@@ -48,7 +48,9 @@ class AddressSerializer(serializers.ModelSerializer):
 
 def _natural(text: str) -> tuple:
     """A sort key that orders runs of digits as numbers: "#9" before "#10"."""
-    return tuple((0, int(part)) if part.isdigit() else (1, part) for part in re.split(r"(\d+)", text) if part)
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part) for part in re.split(r"(\d+)", text) if part
+    )
 
 
 def _address_order(address: Address) -> tuple:
@@ -94,7 +96,15 @@ class StructureSerializer(serializers.ModelSerializer):
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Structure
-        fields = ("id", "source", "source_id", "tract", "tract_county_apns", "tract_addresses", "footprint_sq_ft")
+        fields = (
+            "id",
+            "source",
+            "source_id",
+            "tract",
+            "tract_county_apns",
+            "tract_addresses",
+            "footprint_sq_ft",
+        )
 
     def get_tract_county_apns(self, structure: Structure) -> list[str]:
         return county_apns(structure.tract) if structure.tract else []
@@ -140,7 +150,10 @@ def config(request):
             "search": {"min_query_length": MIN_QUERY_LENGTH},
             # Nearest the structure first.
             "zones": {
-                "rings": [{"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft} for ring in RINGS]
+                "rings": [
+                    {"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft}
+                    for ring in RINGS
+                ]
             },
         }
     )

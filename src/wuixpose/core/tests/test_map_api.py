@@ -28,13 +28,29 @@ def loaded():
             feature({"PARCEL_NO": "146100000002"}, box(0.001, 0, 0.002, 0.001)),
         ]
     )
-    boulder.load_structures([feature({"StructureID": "1N7116110001"}, box(0.0002, 0.0002, 0.0004, 0.0003))])
+    boulder.load_structures(
+        [feature({"StructureID": "1N7116110001"}, box(0.0002, 0.0002, 0.0004, 0.0003))]
+    )
     boulder.load_addresses(
         [
-            point_feature(address_props("2", "10", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0002),
-            point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0003),
-            point_feature(address_props("4", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="10"), 0.0003, 0.0002),
-            point_feature(address_props("3", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="9"), 0.0003, 0.0002),
+            point_feature(
+                address_props("2", "10", "GOLD RUN", "146100000001", STREETTYPE="RD"),
+                0.0003,
+                0.0002,
+            ),
+            point_feature(
+                address_props("1", "9", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0003
+            ),
+            point_feature(
+                address_props("4", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="10"),
+                0.0003,
+                0.0002,
+            ),
+            point_feature(
+                address_props("3", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="9"),
+                0.0003,
+                0.0002,
+            ),
         ]
     )
     assignment.assign_structure_tracts()
@@ -77,14 +93,18 @@ def test_structure_tile_carries_tract_id(client, loaded):
 def test_zone_tile_carries_the_ring_and_whose_it_is(client, loaded):
     structure = loaded["structure"]
     # Rings drawn under earlier rules are kept, but not served.
-    Zone.objects.create(structure=structure, ring_key="hiz_0_5", rule_version=0, geom=structure.geom)
+    Zone.objects.create(
+        structure=structure, ring_key="hiz_0_5", rule_version=0, geom=structure.geom
+    )
 
     response = get_tile(client, "zones", *tile_for(*ORIGIN, 15))
 
     features = mapbox_vector_tile.decode(response.content)["zones"]["features"]
     current = structure.zones.filter(rule_version=zones.RULE_VERSION)
     assert sorted(f["id"] for f in features) == sorted(z.pk for z in current)
-    assert sorted(f["properties"]["ring_key"] for f in features) == sorted(ring.key for ring in zones.RINGS)
+    assert sorted(f["properties"]["ring_key"] for f in features) == sorted(
+        ring.key for ring in zones.RINGS
+    )
     for feat in features:
         assert feat["properties"]["structure_id"] == structure.pk
         assert feat["properties"]["tract_id"] == loaded["tract"].pk
@@ -169,7 +189,8 @@ def test_config_publishes_server_rules(client):
     assert data["search"] == {"min_query_length": search.MIN_QUERY_LENGTH}
     # Nearest first, as RINGS has them, so the UI can number zones by position.
     assert data["zones"]["rings"] == [
-        {"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft} for ring in zones.RINGS
+        {"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft}
+        for ring in zones.RINGS
     ]
 
 
@@ -247,7 +268,13 @@ def test_summary_reports_extent_of_tracts(client, loaded):
 @pytest.mark.django_db
 def test_retired_addresses_are_left_out(client, loaded):
     boulder.load_addresses(
-        [point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STATUS="RETIRED"), 0.0003, 0.0003)]
+        [
+            point_feature(
+                address_props("1", "9", "GOLD RUN", "146100000001", STATUS="RETIRED"),
+                0.0003,
+                0.0003,
+            )
+        ]
     )
 
     tract = client.get(reverse("tract-detail", args=[loaded["tract"].pk])).json()

@@ -15,7 +15,11 @@ interface Props {
 export function AddressSearch({ minQueryLength, onPick }: Props) {
   const [query, setQuery] = useState('')
   // The latest answer, kept on screen while the next query is in flight.
-  const [answer, setAnswer] = useState<{ query: string; results?: SearchResult[]; error?: string } | null>(null)
+  const [answer, setAnswer] = useState<{
+    query: string
+    results?: SearchResult[]
+    error?: string
+  } | null>(null)
   const [active, setActive] = useState(0)
   const [open, setOpen] = useState(false)
   const listId = useId()

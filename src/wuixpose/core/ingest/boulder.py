@@ -41,7 +41,9 @@ COUNTY_FIPS = "08013"
 STATE = "CO"
 PARCELS_URL = "https://maps.bouldercounty.org/arcgis/rest/services/Emap/BOCO_Parcels/MapServer/0"
 FOOTPRINTS_URL = "https://maps.bouldercounty.org/arcgis/rest/services/PARCELS/BUILDINGS_STRUCTURE_FOOTPRINT/MapServer/0"
-ADDRESSES_URL = "https://maps.bouldercounty.org/arcgis/rest/services/PARCELS/ADDRESS_POINTS/MapServer/0"
+ADDRESSES_URL = (
+    "https://maps.bouldercounty.org/arcgis/rest/services/PARCELS/ADDRESS_POINTS/MapServer/0"
+)
 Bbox = tuple[float, float, float, float]
 
 
@@ -75,7 +77,15 @@ def fetch_footprints(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, A
 
 
 # Address point fields that make up the street name, in the order they're written.
-STREET_FIELDS = ("PREFIX", "PREMODIFIER", "PRETYPE", "STREETNAME", "STREETTYPE", "SUFFIX", "POSTMODIFIER")
+STREET_FIELDS = (
+    "PREFIX",
+    "PREMODIFIER",
+    "PRETYPE",
+    "STREETNAME",
+    "STREETTYPE",
+    "SUFFIX",
+    "POSTMODIFIER",
+)
 
 
 def fetch_addresses(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, Any]]:
@@ -123,7 +133,11 @@ def _group_by_key(
         try:
             geom = multipolygon_from_geojson(feature.get("geometry"))
         except UnreadableGeometry as exc:
-            rejected.append(rejects.reject(layer, feature, Reason.UNREADABLE_GEOMETRY, source_id=key, detail=str(exc)))
+            rejected.append(
+                rejects.reject(
+                    layer, feature, Reason.UNREADABLE_GEOMETRY, source_id=key, detail=str(exc)
+                )
+            )
             continue
         if geom is None:
             rejected.append(rejects.reject(layer, feature, Reason.NOT_POLYGONAL, source_id=key))
@@ -134,7 +148,9 @@ def _group_by_key(
     for key, group in pieces.items():
         geom = group[0][1] if len(group) == 1 else as_multipolygon(g for _, g in group)
         if geom is None:
-            rejected.extend(rejects.reject(layer, f, Reason.NOT_POLYGONAL, source_id=key) for f, _ in group)
+            rejected.extend(
+                rejects.reject(layer, f, Reason.NOT_POLYGONAL, source_id=key) for f, _ in group
+            )
             continue
         merged[key] = geom
     return merged, rejected
@@ -165,7 +181,9 @@ def load_tracts(features: Iterable[dict[str, Any]], *, as_of: date | None = None
         result.updated = len(to_update)
 
         new_apns = [apn for apn in by_apn if apn not in existing]
-        tracts = Tract.objects.bulk_create([Tract(geom=by_apn[apn]) for apn in new_apns], batch_size=DB_BATCH_SIZE)
+        tracts = Tract.objects.bulk_create(
+            [Tract(geom=by_apn[apn]) for apn in new_apns], batch_size=DB_BATCH_SIZE
+        )
         TractIdentifier.objects.bulk_create(
             [
                 TractIdentifier(
@@ -192,14 +210,20 @@ def load_structures(features: Iterable[dict[str, Any]]) -> LoadResult:
     with transaction.atomic():
         rejects.record(rejected)
         existing = dict(
-            Structure.objects.filter(source=source, source_id__in=list(by_id)).values_list("source_id", "pk")
+            Structure.objects.filter(source=source, source_id__in=list(by_id)).values_list(
+                "source_id", "pk"
+            )
         )
         to_update = [Structure(pk=pk, geom=by_id[sid]) for sid, pk in existing.items()]
         Structure.objects.bulk_update(to_update, ["geom"], batch_size=DB_BATCH_SIZE)
         result.updated = len(to_update)
 
         created = Structure.objects.bulk_create(
-            [Structure(geom=geom, source=source, source_id=sid) for sid, geom in by_id.items() if sid not in existing],
+            [
+                Structure(geom=geom, source=source, source_id=sid)
+                for sid, geom in by_id.items()
+                if sid not in existing
+            ],
             batch_size=DB_BATCH_SIZE,
         )
         result.created = len(created)
@@ -301,14 +325,26 @@ def load_addresses(
         try:
             geom = point_from_geojson(feature.get("geometry"))
         except UnreadableGeometry as exc:
-            rejected.append(rejects.reject(layer, feature, Reason.UNREADABLE_GEOMETRY, source_id=address_id, detail=str(exc)))
+            rejected.append(
+                rejects.reject(
+                    layer,
+                    feature,
+                    Reason.UNREADABLE_GEOMETRY,
+                    source_id=address_id,
+                    detail=str(exc),
+                )
+            )
             continue
         if geom is None:
-            rejected.append(rejects.reject(layer, feature, Reason.NOT_A_POINT, source_id=address_id))
+            rejected.append(
+                rejects.reject(layer, feature, Reason.NOT_A_POINT, source_id=address_id)
+            )
             continue
         fields = _address_fields(props)
         if fields is None:
-            rejected.append(rejects.reject(layer, feature, Reason.NO_STREET_ADDRESS, source_id=address_id))
+            rejected.append(
+                rejects.reject(layer, feature, Reason.NO_STREET_ADDRESS, source_id=address_id)
+            )
             continue
         by_id[address_id] = fields | {"geom": geom}
     result = LoadResult(skipped=len(rejected))
@@ -320,7 +356,9 @@ def load_addresses(
         # Never null: the filter only matches IDs from by_id.
         existing = {
             cast(str, a.source_id): a
-            for a in ours.filter(source_id__in=list(by_id)).only("source_id", "tracked_to", *ADDRESS_FIELDS)
+            for a in ours.filter(source_id__in=list(by_id)).only(
+                "source_id", "tracked_to", *ADDRESS_FIELDS
+            )
         }
         # Rewriting every row is most of a countywide load's time, and few change between runs.
         to_update = []
@@ -332,7 +370,9 @@ def load_addresses(
                 setattr(address, name, value)
             address.tracked_to = None
             to_update.append(address)
-        Address.objects.bulk_update(to_update, [*ADDRESS_FIELDS, "tracked_to"], batch_size=DB_BATCH_SIZE)
+        Address.objects.bulk_update(
+            to_update, [*ADDRESS_FIELDS, "tracked_to"], batch_size=DB_BATCH_SIZE
+        )
         result.updated = len(to_update)
         result.unchanged = len(existing) - len(to_update)
 
@@ -346,6 +386,10 @@ def load_addresses(
         )
         result.created = len(created)
 
-        gone = ours.current().exclude(source_id__in=present) if complete else ours.current().filter(source_id__in=retired)
+        gone = (
+            ours.current().exclude(source_id__in=present)
+            if complete
+            else ours.current().filter(source_id__in=retired)
+        )
         result.retired = gone.update(tracked_to=as_of)
     return result

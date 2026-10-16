@@ -97,7 +97,9 @@ def normalize(text: str) -> str:
     return " ".join(WORDS.get(word, word) for word in words if word not in UNIT_WORDS)
 
 
-def address_search_text(number: str, street: str, unit: str, jurisdiction: str, state: str, zip_code: str) -> str:
+def address_search_text(
+    number: str, street: str, unit: str, jurisdiction: str, state: str, zip_code: str
+) -> str:
     """The normalized text an address is searched by.
 
     "1172 VALLEY LN UNINCORPORATED BOULDER COUNTY CO 80302". State and ZIP come last so a pasted
@@ -121,7 +123,9 @@ def search_addresses(query: str, limit: int = MAX_RESULTS) -> list[Address]:
 
     number_boost = Value(0.0)
     if number := _leading_number(query):
-        number_boost = Case(When(number__startswith=number, then=Value(NUMBER_PREFIX_BOOST)), default=Value(0.0))
+        number_boost = Case(
+            When(number__startswith=number, then=Value(NUMBER_PREFIX_BOOST)), default=Value(0.0)
+        )
     return list(
         Address.objects.current()
         # trigram_word_similar (pg_trgm's %>) is what the GIN index serves; the similarity it
@@ -130,5 +134,7 @@ def search_addresses(query: str, limit: int = MAX_RESULTS) -> list[Address]:
         .annotate(rank=TrigramWordSimilarity(query, "search_text") + number_boost)
         # Ties (every unit at one address, every address on a street) go in street order, with
         # house numbers in numeric order: shorter numbers first.
-        .order_by(F("rank").desc(), "street", Length("number"), "number", Length("unit"), "unit", "pk")[:limit]
+        .order_by(
+            F("rank").desc(), "street", Length("number"), "number", Length("unit"), "unit", "pk"
+        )[:limit]
     )

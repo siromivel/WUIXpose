@@ -28,7 +28,9 @@ class Address(models.Model):
 
     geom = models.PointField(srid=STORAGE_SRID)
     # Where the address came from and its ID there, as on Structure.
-    source = models.CharField(max_length=32, choices=Source.choices, null=True, blank=True, db_collation="C")
+    source = models.CharField(
+        max_length=32, choices=Source.choices, null=True, blank=True, db_collation="C"
+    )
     source_id = models.CharField(max_length=64, null=True, blank=True, db_collation="C")
 
     number = models.CharField(max_length=32)  # "1172", "1172 1/2", "MM40.7" (a highway mile marker)

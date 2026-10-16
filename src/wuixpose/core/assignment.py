@@ -126,6 +126,9 @@ def assign_structure_tracts(*, full: bool = False) -> AssignResult:
     """
     with incremental_run(JobRun.Job.ASSIGN_STRUCTURE_TRACTS, full=full) as run:
         candidates = _ALL_CANDIDATES if run.full else _CHANGED_CANDIDATES
-        run.cursor.execute(_ASSIGN.format(candidates=candidates), {"since": run.since, "min_share": MIN_TRACT_SHARE})
+        run.cursor.execute(
+            _ASSIGN.format(candidates=candidates),
+            {"since": run.since, "min_share": MIN_TRACT_SHARE},
+        )
         run.rows_changed = run.cursor.rowcount
     return AssignResult(changed=run.rows_changed, full=run.full)

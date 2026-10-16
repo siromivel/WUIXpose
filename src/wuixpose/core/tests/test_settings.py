@@ -36,6 +36,8 @@ def test_debug_mode_runs_without_a_secret_key():
 
 
 def test_allowed_hosts_from_environment():
-    result = load_settings(DJANGO_DEBUG="false", DJANGO_SECRET_KEY="x" * 50, DJANGO_ALLOWED_HOSTS="a.example,b.example")
+    result = load_settings(
+        DJANGO_DEBUG="false", DJANGO_SECRET_KEY="x" * 50, DJANGO_ALLOWED_HOSTS="a.example,b.example"
+    )
 
     assert result.stdout.strip() == "False ['a.example', 'b.example']"

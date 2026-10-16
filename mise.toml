@@ -11,6 +11,7 @@ run = [
   "uv sync",
   "npm --prefix frontend ci",
   "uv run pre-commit install",  # hook types from .pre-commit-config.yaml
+  "git config blame.ignoreRevsFile .git-blame-ignore-revs",
 ]
 
 [tasks.db]

@@ -216,6 +216,9 @@ Claude Code sessions also format each Python or frontend file right after editin
 `.claude/settings.json`, the one shared file under `.claude/`; personal settings go in
 `.claude/settings.local.json`, which git ignores).
 
+`git blame` skips commits that only reformat code, listed in `.git-blame-ignore-revs`. GitHub reads
+the file on its own; `mise run setup` also points your local git at it.
+
 ## Layout
 
 ```

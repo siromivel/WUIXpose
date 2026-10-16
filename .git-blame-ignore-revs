@@ -1,0 +1,6 @@
+# Commits that only reformat code, which git blame skips: GitHub reads this file automatically, and
+# `mise run setup` points local git at it (blame.ignoreRevsFile). Add a commit here once it's
+# merged, by its full hash.
+
+# Format Python with ruff and the frontend with oxfmt
+2d5fe4c9500d65451b9439632abc70d46c3dec55

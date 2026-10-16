@@ -59,15 +59,16 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 
 ## Geospatial (PostGIS / GeoDjango)
 - Geometries are stored in SRID 4326 as (lon, lat), not (lat, lon). Use the `STORAGE_SRID`
-  constant from `core/models/tracts.py`; don't hardcode 4326.
+  constant from `core/constants.py`; don't hardcode 4326 (or any SRID), in Python or SQL.
 - Never buffer or measure directly on stored geometries; their units are degrees.
   - Distances and buffers: cast to `geography`, which works in meters (as `core/zones.py` does).
-  - Areas: transform to equal-area EPSG:5070 (as `core/api.py` does).
+  - Areas: transform to equal-area `EQUAL_AREA_SRID` (EPSG:5070, as `core/api.py` does).
   - Tests can verify distances in UTM 13N (EPSG:32613), as `test_zones.py` does.
 - Keep spatial filters index-friendly: `ST_DWithin` rather than `ST_Distance < x`, and transform
-  the query shape (e.g. a tile envelope) to 4326 rather than transforming every row
+  the query shape (e.g. a tile envelope) to `STORAGE_SRID` rather than transforming every row
   (as `core/tiles.py` does).
 - Zone rings live in `RINGS` in `core/zones.py`. Changing them means bumping `RULE_VERSION`.
+  The frontend reads them from `/api/config/`; it only colors them, by key (`ZONE_COLORS`).
 - Tile layers are defined in `LAYERS` in `core/tiles.py`. The frontend reads each layer's
   TileJSON; never hardcode tile URLs or zoom ranges in the frontend.
 
@@ -86,8 +87,18 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Business logic goes in plain service functions, not in views, model methods or management
   commands. Commands stay thin wrappers (see `build_zones`).
 - Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `search.py`,
-  `ingest/`.
+  `display.py`, `assignment.py`, `jobs.py`, `ingest/`.
   Add a new module for a new feature rather than growing an unrelated one.
+- Imports follow layers: `constants.py` → `models/` → services → `api.py`, `tiles.py`, `views.py`
+  and commands. Import only from layers below, never above, so modules can't form import cycles
+  (`test_layering.py` enforces this).
+  - `constants.py` imports nothing from `wuixpose`. Values shared across layers (SRIDs, unit
+    conversions, batch sizes, data credits) go there. Values one module owns stay in that module
+    (`RINGS`, `boulder.COUNTY_FIPS`).
+  - Models import only `constants.py` and each other, never a service, not even for `__str__`.
+  - Deployment settings that differ between environments go in settings/env instead, never
+    domain facts that must match stored data (an SRID, a ring distance).
+- Jobs that process changes since their last run use `jobs.incremental_run` (see `build_zones`).
 - Use the ORM. Raw SQL only when GeoDjango can't express a PostGIS query,
   and always parameterized, never string-formatted.
 - Avoid N+1 queries: use `select_related` / `prefetch_related` when iterating relations.
@@ -105,6 +116,8 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
   (`Checked<typeof ...>`). Change a response's shape there, never with a separate interface or an
   `as` cast. Keep it in step with the serializers in `core/api.py`.
 - Build-time settings come from `VITE_*` variables, with defaults in `frontend/src/config.ts`.
+- Rules the server sets (the search minimum, zone rings) come from `/api/config/` (`config` in
+  `core/api.py`), loaded at startup. Never copy a backend constant into the frontend; add it there.
 - Tests use Vitest, in a `*.test.ts` file next to the module they cover. Stub `fetch` rather than
   calling a server (see `api.test.ts`). Test files are type-checked with the app, so
   `expectTypeOf` assertions fail `frontend-check`, not `frontend-test`.

@@ -1,4 +1,5 @@
-"""Read-only JSON for the map: what's loaded, details for a clicked tract or structure, and search.
+"""Read-only JSON for the map: the rules it follows, what's loaded, details for a clicked tract or
+structure, and search.
 
 Shapes themselves go to the map as vector tiles (see tiles.py); these endpoints carry the
 attributes a popup or side panel needs.
@@ -13,13 +14,11 @@ from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .constants import EQUAL_AREA_SRID, SQ_FT_PER_SQ_M, SQ_M_PER_ACRE
+from .display import address_line1, address_line2
 from .models import Address, Structure, Tract
-from .search import search_addresses
-
-# NAD83 / CONUS Albers, an equal-area projection in meters, for measuring areas in the US.
-EQUAL_AREA_SRID = 5070
-SQ_M_PER_ACRE = 4046.8564224
-SQ_FT_PER_SQ_M = 10.763910417
+from .search import MIN_QUERY_LENGTH, search_addresses
+from .zones import RINGS
 
 
 def area_sq_m(geom: GEOSGeometry) -> float:
@@ -31,14 +30,20 @@ def county_apns(tract: Tract) -> list[str]:
 
 
 class AddressSerializer(serializers.ModelSerializer):
-    line1 = serializers.CharField(source="display_line1")
-    line2 = serializers.CharField(source="display_line2")
+    line1 = serializers.SerializerMethodField()
+    line2 = serializers.SerializerMethodField()
     lon = serializers.FloatField(source="geom.x")
     lat = serializers.FloatField(source="geom.y")
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Address
         fields = ("id", "line1", "line2", "lon", "lat")
+
+    def get_line1(self, address: Address) -> str:
+        return address_line1(address)
+
+    def get_line2(self, address: Address) -> str:
+        return address_line2(address)
 
 
 def _natural(text: str) -> tuple:
@@ -125,6 +130,20 @@ def search(request):
     """Current addresses best matching ?q=, best first. Empty for a missing or too-short query."""
     results = search_addresses(request.query_params.get("q", ""))
     return Response({"results": SearchResultSerializer(results, many=True).data})
+
+
+@api_view(["GET"])
+def config(request):
+    """Rules the server sets that the map UI follows, so the UI never keeps its own copy."""
+    return Response(
+        {
+            "search": {"min_query_length": MIN_QUERY_LENGTH},
+            # Nearest the structure first.
+            "zones": {
+                "rings": [{"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft} for ring in RINGS]
+            },
+        }
+    )
 
 
 @api_view(["GET"])

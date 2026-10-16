@@ -16,7 +16,7 @@ from django.contrib.gis.geos import (
 )
 from django.contrib.gis.geos.error import GEOSException
 
-from wuixpose.core.models.tracts import STORAGE_SRID
+from wuixpose.core.constants import STORAGE_SRID
 
 
 class UnreadableGeometry(ValueError):

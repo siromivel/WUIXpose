@@ -1,6 +1,6 @@
 from django.contrib.gis.geos import MultiPolygon, Polygon
 
-from wuixpose.core.models.tracts import STORAGE_SRID
+from wuixpose.core.constants import STORAGE_SRID
 
 # A spot in the Boulder County foothills; tests build shapes relative to it.
 ORIGIN = (-105.40, 40.05)

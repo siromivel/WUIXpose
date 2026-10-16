@@ -1,4 +1,4 @@
-import type { TileJSON } from './api'
+import type { TileJSON, ZoneRing } from './api'
 
 export type Selection = { kind: 'tract' | 'structure'; id: number } | null
 
@@ -14,11 +14,24 @@ export interface LayerVisibility {
   imagery: boolean
 }
 
-// How the rings in zone tiles are shown, nearest the structure first. Keys are the server's
-// (RINGS in src/wuixpose/core/zones.py); a ring not listed here draws in ZONE_FALLBACK_COLOR.
-export const ZONE_RINGS = [
-  { key: 'hiz_0_5', label: 'Zone 1', range: '0–5 ft', color: '#c1121f' },
-  { key: 'hiz_5_30', label: 'Zone 2', range: '5–30 ft', color: '#f4a100' },
-  { key: 'hiz_30_100', label: 'Zone 3', range: '30–100 ft', color: '#2a9d8f' },
-] as const
+// How zone rings are colored. The rings themselves, their keys and distances, come from the
+// server (/api/config/); a ring not listed here draws in ZONE_FALLBACK_COLOR.
+export const ZONE_COLORS: Partial<Record<string, string>> = {
+  hiz_0_5: '#c1121f',
+  hiz_5_30: '#f4a100',
+  hiz_30_100: '#2a9d8f',
+}
 export const ZONE_FALLBACK_COLOR = '#6b7280'
+
+export function zoneColor(ring: ZoneRing): string {
+  return ZONE_COLORS[ring.key] ?? ZONE_FALLBACK_COLOR
+}
+
+// Rings come nearest the structure first, which is how home ignition zones are numbered.
+export function zoneLabel(index: number): string {
+  return `Zone ${index + 1}`
+}
+
+export function zoneRange(ring: ZoneRing): string {
+  return `${ring.inner_ft}–${ring.outer_ft} ft`
+}

@@ -1,27 +1,30 @@
 import { useEffect, useState } from 'react'
 
-import { type SearchResult, type Summary, fetchSummary, fetchTileJson } from './api'
+import { type SearchResult, type ServerConfig, type Summary, fetchServerConfig, fetchSummary, fetchTileJson } from './api'
 import { type LayerVisibility, type Selection, TILE_LAYERS, type TileSources } from './layers'
 import { type Focus, MapView } from './MapView'
 import { Panel } from './Panel'
 
-// What the map needs before it can be built: where the data is, and how its tiles are served.
-interface MapData {
+// What the app needs before it can start: the rules the server sets, where the data is, and how
+// its tiles are served.
+interface AppData {
+  serverConfig: ServerConfig
   summary: Summary
   tileSources: TileSources
 }
 
-async function loadMapData(signal: AbortSignal): Promise<MapData> {
-  const [summary, ...tileJsons] = await Promise.all([
+async function loadAppData(signal: AbortSignal): Promise<AppData> {
+  const [serverConfig, summary, ...tileJsons] = await Promise.all([
+    fetchServerConfig(signal),
     fetchSummary(signal),
     ...TILE_LAYERS.map((layer) => fetchTileJson(layer, signal)),
   ])
   const tileSources = Object.fromEntries(TILE_LAYERS.map((layer, i) => [layer, tileJsons[i]])) as TileSources
-  return { summary, tileSources }
+  return { serverConfig, summary, tileSources }
 }
 
 export default function App() {
-  const [mapData, setMapData] = useState<MapData | null>(null)
+  const [appData, setAppData] = useState<AppData | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [visible, setVisible] = useState<LayerVisibility>({ tracts: true, structures: true, zones: true, imagery: false })
   const [selection, setSelection] = useState<Selection>(null)
@@ -37,8 +40,8 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController()
-    loadMapData(controller.signal)
-      .then(setMapData)
+    loadAppData(controller.signal)
+      .then(setAppData)
       .catch((err: unknown) => {
         if (!controller.signal.aborted) setLoadError(String(err))
       })
@@ -48,8 +51,9 @@ export default function App() {
   return (
     <div className="app">
       <Panel
-        summary={mapData?.summary ?? null}
-        tileSources={mapData?.tileSources ?? null}
+        serverConfig={appData?.serverConfig ?? null}
+        summary={appData?.summary ?? null}
+        tileSources={appData?.tileSources ?? null}
         loadError={loadError}
         zoom={zoom}
         visible={visible}
@@ -58,10 +62,11 @@ export default function App() {
         onSelect={setSelection}
         onPickAddress={pickAddress}
       />
-      {mapData && (
+      {appData && (
         <MapView
-          initialBbox={mapData.summary.bbox}
-          tileSources={mapData.tileSources}
+          initialBbox={appData.summary.bbox}
+          tileSources={appData.tileSources}
+          zoneRings={appData.serverConfig.zones.rings}
           visible={visible}
           focus={focus}
           selection={selection}

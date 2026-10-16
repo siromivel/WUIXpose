@@ -4,9 +4,9 @@ document per layer describing them.
 The TileJSON is the contract with map clients: tile URL template, zoom range, attribution and
 the properties each feature carries. Clients read it rather than hardcoding any of that.
 
-Geometries are stored in 4326 and tiles are in Web Mercator (3857). Each layer filters with the
-tile envelope transformed to 4326, rather than transforming every row to 3857, so the GiST index
-on geom finds the candidate rows.
+Geometries are stored in STORAGE_SRID and tiles are in Web Mercator. Each layer filters with the
+tile envelope transformed to STORAGE_SRID, rather than transforming every row to Web Mercator, so
+the GiST index on geom finds the candidate rows.
 """
 
 from dataclasses import dataclass
@@ -18,13 +18,21 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from wuixpose.core import zones
-from wuixpose.core.ingest import boulder
+from wuixpose.core.constants import (
+    BOULDER_COUNTY_ATTRIBUTION,
+    STORAGE_SRID,
+    WEB_MERCATOR_SRID,
+)
+from wuixpose.core.models.tracts import TractIdentifier
 
 MVT_CONTENT_TYPE = "application/vnd.mapbox-vector-tile"
 
-# Placeholders for layer SQL. Every non-geometry column a layer selects becomes a tile property.
-ENVELOPE_4326 = "ST_Transform(ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4326)"
-MVT_GEOM = "ST_AsMVTGeom(ST_Transform({col}, 3857), ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4096, 64, true)"
+# Placeholders for layer SQL, filled from render_tile's parameters. Every non-geometry column a
+# layer selects becomes a tile property.
+ENVELOPE_STORAGE = "ST_Transform(ST_TileEnvelope(%(z)s, %(x)s, %(y)s), %(storage_srid)s)"
+MVT_GEOM = (
+    "ST_AsMVTGeom(ST_Transform({col}, %(web_mercator_srid)s), ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4096, 64, true)"
+)
 
 
 @dataclass(frozen=True)
@@ -46,17 +54,17 @@ LAYERS = {
         min_zoom=12,
         max_zoom=16,
         fields={"apn": "String"},
-        attribution=boulder.ATTRIBUTION,
+        attribution=BOULDER_COUNTY_ATTRIBUTION,
         sql=f"""
             SELECT t.id,
                    (SELECT i.value
                       FROM core_tractidentifier i
-                     WHERE i.tract_id = t.id AND i.scheme = 'county_apn' AND i.tracked_to IS NULL
+                     WHERE i.tract_id = t.id AND i.scheme = %(apn_scheme)s AND i.tracked_to IS NULL
                      ORDER BY i.id
                      LIMIT 1) AS apn,
                    {MVT_GEOM.format(col="t.geom")} AS mvt_geom
               FROM core_tract t
-             WHERE t.geom && {ENVELOPE_4326}
+             WHERE t.geom && {ENVELOPE_STORAGE}
         """,
     ),
     "structures": TileLayer(
@@ -64,11 +72,11 @@ LAYERS = {
         min_zoom=13,
         max_zoom=16,
         fields={"tract_id": "Number"},
-        attribution=boulder.ATTRIBUTION,
+        attribution=BOULDER_COUNTY_ATTRIBUTION,
         sql=f"""
             SELECT s.id, s.tract_id, {MVT_GEOM.format(col="s.geom")} AS mvt_geom
               FROM core_structure s
-             WHERE s.geom && {ENVELOPE_4326}
+             WHERE s.geom && {ENVELOPE_STORAGE}
         """,
     ),
     "zones": TileLayer(
@@ -78,13 +86,13 @@ LAYERS = {
         max_zoom=16,
         fields={"structure_id": "Number", "tract_id": "Number", "ring_key": "String"},
         # Drawn from the county's footprints.
-        attribution=boulder.ATTRIBUTION,
+        attribution=BOULDER_COUNTY_ATTRIBUTION,
         sql=f"""
             SELECT z.id, z.structure_id, s.tract_id, z.ring_key, {MVT_GEOM.format(col="z.geom")} AS mvt_geom
               FROM core_zone z
               JOIN core_structure s ON s.id = z.structure_id
              WHERE z.rule_version = %(rule_version)s
-               AND z.geom && {ENVELOPE_4326}
+               AND z.geom && {ENVELOPE_STORAGE}
         """,
     ),
 }
@@ -110,7 +118,17 @@ def render_tile(layer_name: str, z: int, x: int, y: int) -> bytes:
     """
     with connection.cursor() as cursor:
         cursor.execute(
-            sql, {"z": z, "x": x, "y": y, "layer": layer_name, "rule_version": zones.RULE_VERSION}
+            sql,
+            {
+                "z": z,
+                "x": x,
+                "y": y,
+                "layer": layer_name,
+                "storage_srid": STORAGE_SRID,
+                "web_mercator_srid": WEB_MERCATOR_SRID,
+                "rule_version": zones.RULE_VERSION,
+                "apn_scheme": TractIdentifier.Scheme.COUNTY_APN,
+            },
         )
         row = cursor.fetchone()
         assert row is not None  # an aggregate without GROUP BY always returns a row

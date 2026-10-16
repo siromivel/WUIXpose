@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.db.models import Q
 from django.db.models.functions import Now
 
-from .tracts import STORAGE_SRID
+from wuixpose.core.constants import STORAGE_SRID
 
 if TYPE_CHECKING:
     # RelatedManager exists only in the type stubs.

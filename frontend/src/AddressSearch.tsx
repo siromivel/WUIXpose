@@ -2,16 +2,17 @@ import { type KeyboardEvent, useEffect, useId, useState } from 'react'
 
 import { type SearchResult, searchAddresses } from './api'
 
-// The server answers shorter queries with nothing (MIN_QUERY_LENGTH in core/search.py).
-const MIN_QUERY_LENGTH = 3
 // Wait for a pause in typing before asking the server.
 const DEBOUNCE_MS = 200
 
 interface Props {
+  // The server answers shorter queries with nothing. Null until the server's config has loaded,
+  // and searching waits for it.
+  minQueryLength: number | null
   onPick: (result: SearchResult) => void
 }
 
-export function AddressSearch({ onPick }: Props) {
+export function AddressSearch({ minQueryLength, onPick }: Props) {
   const [query, setQuery] = useState('')
   // The latest answer, kept on screen while the next query is in flight.
   const [answer, setAnswer] = useState<{ query: string; results?: SearchResult[]; error?: string } | null>(null)
@@ -20,7 +21,7 @@ export function AddressSearch({ onPick }: Props) {
   const listId = useId()
 
   const trimmed = query.trim()
-  const searchable = trimmed.length >= MIN_QUERY_LENGTH
+  const searchable = minQueryLength !== null && trimmed.length >= minQueryLength
 
   useEffect(() => {
     if (!searchable) return
@@ -66,8 +67,9 @@ export function AddressSearch({ onPick }: Props) {
     <div className="search">
       <input
         type="search"
-        placeholder="Find an address"
+        placeholder={minQueryLength === null ? 'Loading…' : 'Find an address'}
         aria-label="Find an address"
+        disabled={minQueryLength === null}
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={showList && results.length > 0}

@@ -1,4 +1,5 @@
-"""Read-only JSON for the map: what's loaded, details for a clicked tract or structure, and search.
+"""Read-only JSON for the map: the rules it follows, what's loaded, details for a clicked tract or
+structure, and search.
 
 Shapes themselves go to the map as vector tiles (see tiles.py); these endpoints carry the
 attributes a popup or side panel needs.
@@ -16,7 +17,8 @@ from rest_framework.response import Response
 from .constants import EQUAL_AREA_SRID, SQ_FT_PER_SQ_M, SQ_M_PER_ACRE
 from .display import address_line1, address_line2
 from .models import Address, Structure, Tract
-from .search import search_addresses
+from .search import MIN_QUERY_LENGTH, search_addresses
+from .zones import RINGS
 
 
 def area_sq_m(geom: GEOSGeometry) -> float:
@@ -128,6 +130,20 @@ def search(request):
     """Current addresses best matching ?q=, best first. Empty for a missing or too-short query."""
     results = search_addresses(request.query_params.get("q", ""))
     return Response({"results": SearchResultSerializer(results, many=True).data})
+
+
+@api_view(["GET"])
+def config(request):
+    """Rules the server sets that the map UI follows, so the UI never keeps its own copy."""
+    return Response(
+        {
+            "search": {"min_query_length": MIN_QUERY_LENGTH},
+            # Nearest the structure first.
+            "zones": {
+                "rings": [{"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft} for ring in RINGS]
+            },
+        }
+    )
 
 
 @api_view(["GET"])

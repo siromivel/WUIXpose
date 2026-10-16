@@ -4,7 +4,7 @@ import mapbox_vector_tile
 import pytest
 from django.urls import reverse
 
-from wuixpose.core import assignment, tiles, zones
+from wuixpose.core import assignment, search, tiles, zones
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import Structure, Tract, Zone
 
@@ -160,7 +160,17 @@ def test_tilejson_unknown_layer_is_404(client):
     assert client.get(reverse("tilejson", args=["roads"])).status_code == 404
 
 
-# Detail and summary endpoints
+# Config, detail and summary endpoints
+
+
+def test_config_publishes_server_rules(client):
+    data = client.get(reverse("config")).json()
+
+    assert data["search"] == {"min_query_length": search.MIN_QUERY_LENGTH}
+    # Nearest first, as RINGS has them, so the UI can number zones by position.
+    assert data["zones"]["rings"] == [
+        {"key": ring.key, "inner_ft": ring.inner_ft, "outer_ft": ring.outer_ft} for ring in zones.RINGS
+    ]
 
 
 @pytest.mark.django_db

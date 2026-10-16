@@ -68,6 +68,7 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
   the query shape (e.g. a tile envelope) to `STORAGE_SRID` rather than transforming every row
   (as `core/tiles.py` does).
 - Zone rings live in `RINGS` in `core/zones.py`. Changing them means bumping `RULE_VERSION`.
+  The frontend reads them from `/api/config/`; it only colors them, by key (`ZONE_COLORS`).
 - Tile layers are defined in `LAYERS` in `core/tiles.py`. The frontend reads each layer's
   TileJSON; never hardcode tile URLs or zoom ranges in the frontend.
 
@@ -115,6 +116,8 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
   (`Checked<typeof ...>`). Change a response's shape there, never with a separate interface or an
   `as` cast. Keep it in step with the serializers in `core/api.py`.
 - Build-time settings come from `VITE_*` variables, with defaults in `frontend/src/config.ts`.
+- Rules the server sets (the search minimum, zone rings) come from `/api/config/` (`config` in
+  `core/api.py`), loaded at startup. Never copy a backend constant into the frontend; add it there.
 - Tests use Vitest, in a `*.test.ts` file next to the module they cover. Stub `fetch` rather than
   calling a server (see `api.test.ts`). Test files are type-checked with the app, so
   `expectTypeOf` assertions fail `frontend-check`, not `frontend-test`.

@@ -145,13 +145,16 @@ the panel finds an address, flies the map there and selects its lot.
 | --- | --- |
 | `/tiles/{tracts,structures,zones}.json` | [TileJSON](https://github.com/mapbox/tilejson-spec/tree/master/3.0.0): tile URL template, zoom range, attribution, feature properties |
 | `/tiles/{tracts,structures,zones}/{z}/{x}/{y}.mvt` | Vector tiles; feature ids are model ids. Zone tiles hold every structure's rings, overlaps included |
+| `/api/config/` | Rules the server sets that map clients follow: the shortest query search answers, and the zone rings (key and distances in feet, nearest first) |
 | `/api/summary/` | Counts and the bounding box of loaded tracts |
 | `/api/tracts/<id>/` | Addresses, county parcel numbers, acreage, structure ids |
 | `/api/structures/<id>/` | Source ID, tract and its addresses and county parcel numbers, footprint square feet |
 | `/api/search/?q=` | Up to 10 current addresses best matching `q`, best first, each with its point and tract (see [Address search](#address-search)) |
 
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
-frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`.
+frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`. Likewise, they
+should read the search minimum and zone rings from `/api/config/` rather than keep a copy; the
+frontend loads it at startup, and keeps only how each ring is colored.
 
 The frontend checks every response against its expected shape before using it (`frontend/src/api.ts`,
 built from the checks in `frontend/src/validate.ts`). A response that doesn't match fails with a

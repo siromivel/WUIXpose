@@ -4,15 +4,17 @@ import { AddressSearch } from './AddressSearch'
 import {
   type Address,
   type SearchResult,
+  type ServerConfig,
   type StructureDetail,
   type Summary,
   type TractDetail,
   fetchStructure,
   fetchTract,
 } from './api'
-import { type LayerVisibility, type Selection, type TileSources, ZONE_RINGS } from './layers'
+import { type LayerVisibility, type Selection, type TileSources, zoneColor, zoneLabel, zoneRange } from './layers'
 
 interface Props {
+  serverConfig: ServerConfig | null
   summary: Summary | null
   tileSources: TileSources | null
   loadError: string | null
@@ -34,6 +36,7 @@ const LAYER_LABELS: Record<keyof LayerVisibility, string> = {
 const number = new Intl.NumberFormat('en-US')
 
 export function Panel({
+  serverConfig,
   summary,
   tileSources,
   loadError,
@@ -52,7 +55,7 @@ export function Panel({
       </header>
 
       <section>
-        <AddressSearch onPick={onPickAddress} />
+        <AddressSearch minQueryLength={serverConfig?.search.min_query_length ?? null} onPick={onPickAddress} />
       </section>
 
       <section>
@@ -95,13 +98,13 @@ export function Panel({
             </label>
           )
         })}
-        {visible.zones && (
+        {visible.zones && serverConfig && (
           <ul className="legend">
-            {ZONE_RINGS.map((ring) => (
+            {serverConfig.zones.rings.map((ring, i) => (
               <li key={ring.key}>
-                <span className="swatch" style={{ background: ring.color }} />
-                {ring.label}
-                <span className="range">{ring.range} from the structure</span>
+                <span className="swatch" style={{ background: zoneColor(ring) }} />
+                {zoneLabel(i)}
+                <span className="range">{zoneRange(ring)} from the structure</span>
               </li>
             ))}
           </ul>

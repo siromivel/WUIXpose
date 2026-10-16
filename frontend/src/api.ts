@@ -22,6 +22,17 @@ const bbox: Check<Bbox> = (value, path) => {
   return values.length === 4 ? [values[0], values[1], values[2], values[3]] : fail(path, '4 numbers', value)
 }
 
+// A ring drawn around each structure, as distances from its footprint (RINGS in core/zones.py).
+const zoneRing = object({ key: string, inner_ft: number, outer_ft: number })
+export type ZoneRing = Checked<typeof zoneRing>
+
+// Rules the server sets and the UI follows, so the UI never keeps its own copy of them.
+const serverConfig = object({
+  search: object({ min_query_length: number }),
+  zones: object({ rings: array(zoneRing) }), // nearest the structure first
+})
+export type ServerConfig = Checked<typeof serverConfig>
+
 const summary = object({
   tract_count: number,
   structure_count: number,
@@ -93,6 +104,8 @@ async function getJson<T>(path: string, check: Check<T>, signal?: AbortSignal): 
     throw err
   }
 }
+
+export const fetchServerConfig = (signal?: AbortSignal) => getJson('/api/config/', serverConfig, signal)
 
 export const fetchSummary = (signal?: AbortSignal) => getJson('/api/summary/', summary, signal)
 

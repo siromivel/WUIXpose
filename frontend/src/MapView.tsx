@@ -13,7 +13,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useRef, useState } from 'react'
 
-import type { Bbox } from './api'
+import type { Bbox, ZoneRing } from './api'
 import { config } from './config'
 import {
   type LayerVisibility,
@@ -21,7 +21,7 @@ import {
   TILE_LAYERS,
   type TileSources,
   ZONE_FALLBACK_COLOR,
-  ZONE_RINGS,
+  zoneColor,
 } from './layers'
 
 // MapLibre looks for its worker next to its own module file, which isn't where Vite puts
@@ -37,6 +37,7 @@ export interface Focus {
 interface Props {
   initialBbox: Bbox | null
   tileSources: TileSources
+  zoneRings: ZoneRing[]
   visible: LayerVisibility
   focus: Focus | null
   selection: Selection
@@ -62,19 +63,20 @@ const selected: ExpressionSpecification = ['boolean', ['feature-state', 'selecte
 
 // A value chosen by the feature's ring, as a style expression.
 function byRing<T extends string | number>(
-  value: (ring: (typeof ZONE_RINGS)[number], index: number) => T,
+  rings: ZoneRing[],
+  value: (ring: ZoneRing, index: number) => T,
   fallback: T,
 ): ExpressionSpecification {
-  return ZONE_RINGS.reduceRight<ExpressionSpecification>(
+  return rings.reduceRight<ExpressionSpecification>(
     (otherwise, ring, i) => ['case', ['==', ['get', 'ring_key'], ring.key], value(ring, i), otherwise],
     ['literal', fallback],
   )
 }
 
-const ringColor = byRing((ring) => ring.color, ZONE_FALLBACK_COLOR)
 // Zones of neighboring structures overlap, and the ring nearer its own structure ranks higher:
-// a spot 5 ft from one building and 50 ft from another is zone 1.
-const ringRank = byRing((_, i) => ZONE_RINGS.length - i, 0)
+// a spot 5 ft from one building and 50 ft from another is zone 1. A ring the server didn't
+// list ranks lowest.
+const ringRank = (rings: ZoneRing[]) => byRing(rings, (_, i) => rings.length - i, 0)
 // Meters. Enough to order the rings in the depth buffer, too little to see when the map is tilted.
 const ZONE_SLAB_STEP = 0.25
 // Close enough to see a house's zones and its neighbors'.
@@ -86,7 +88,7 @@ function zonesOf(selection: Selection): FilterSpecification {
   return ['==', ['get', selection.kind === 'structure' ? 'structure_id' : 'tract_id'], selection.id]
 }
 
-function addDataLayers(map: MapLibreMap, tileSources: TileSources) {
+function addDataLayers(map: MapLibreMap, tileSources: TileSources, zoneRings: ZoneRing[]) {
   map.addSource('imagery', {
     type: 'raster',
     tiles: [config.imageryTiles],
@@ -140,8 +142,8 @@ function addDataLayers(map: MapLibreMap, tileSources: TileSources) {
     source: 'zones',
     'source-layer': 'zones',
     paint: {
-      'fill-extrusion-color': ringColor,
-      'fill-extrusion-height': ['*', ringRank, ZONE_SLAB_STEP],
+      'fill-extrusion-color': byRing(zoneRings, zoneColor, ZONE_FALLBACK_COLOR),
+      'fill-extrusion-height': ['*', ringRank(zoneRings), ZONE_SLAB_STEP],
       'fill-extrusion-opacity': 0.3,
     },
   })
@@ -160,7 +162,7 @@ function addDataLayers(map: MapLibreMap, tileSources: TileSources) {
     filter: zonesOf(null),
     paint: {
       'fill-extrusion-color': COLORS.zonesSelected,
-      'fill-extrusion-height': (ZONE_RINGS.length + 1) * ZONE_SLAB_STEP,
+      'fill-extrusion-height': (zoneRings.length + 1) * ZONE_SLAB_STEP,
       'fill-extrusion-opacity': 0.25,
     },
   })
@@ -200,12 +202,13 @@ function featureId(selection: NonNullable<Selection>): FeatureIdentifier {
   return { source: layer, sourceLayer: layer, id: selection.id }
 }
 
-export function MapView({ initialBbox, tileSources, visible, focus, selection, onSelect, onZoom }: Props) {
+export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, selection, onSelect, onZoom }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  // Only the first values matter: they set the opening view and the sources.
+  // Only the first values matter: they set the opening view, the sources and their styling.
   const initialBboxRef = useRef(initialBbox)
   const tileSourcesRef = useRef(tileSources)
+  const zoneRingsRef = useRef(zoneRings)
   // Read inside map event handlers, which are bound once.
   const onSelectRef = useRef(onSelect)
   const onZoomRef = useRef(onZoom)
@@ -242,7 +245,7 @@ export function MapView({ initialBbox, tileSources, visible, focus, selection, o
     instance.on('load', () => {
       // Draw our layers under the basemap's labels so place names stay readable.
       const firstLabel = instance.getStyle().layers.find((l) => l.type === 'symbol')?.id
-      addDataLayers(instance, tileSourcesRef.current)
+      addDataLayers(instance, tileSourcesRef.current, zoneRingsRef.current)
       if (firstLabel) {
         for (const id of Object.values(LAYER_IDS).flat()) instance.moveLayer(id, firstLabel)
       }

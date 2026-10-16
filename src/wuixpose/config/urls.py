@@ -7,6 +7,7 @@ from wuixpose.core.views import health
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),
+    path("api/config/", api.config, name="config"),
     path("api/summary/", api.summary, name="summary"),
     path("api/tracts/<int:pk>/", api.tract_detail, name="tract-detail"),
     path("api/structures/<int:pk>/", api.structure_detail, name="structure-detail"),

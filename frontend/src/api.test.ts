@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchStructure, fetchSummary, fetchTileJson, searchAddresses } from './api'
+import { fetchServerConfig, fetchStructure, fetchSummary, fetchTileJson, searchAddresses } from './api'
 import { InvalidData } from './validate'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -25,6 +25,28 @@ const address = {
   lon: -105.4,
   lat: 40.05,
 }
+
+describe('fetchServerConfig', () => {
+  const rings = [
+    { key: 'hiz_0_5', inner_ft: 0, outer_ft: 5 },
+    { key: 'hiz_5_30', inner_ft: 5, outer_ft: 30 },
+  ]
+
+  it('returns the checked config, without unknown fields', async () => {
+    respondWith({ search: { min_query_length: 3, max_results: 10 }, zones: { rings, rule_version: 1 } })
+
+    expect(await fetchServerConfig()).toEqual({ search: { min_query_length: 3 }, zones: { rings } })
+    expect(fetchMock).toHaveBeenCalledWith('/api/config/', { signal: undefined })
+  })
+
+  it('names the bad field inside a ring', async () => {
+    respondWith({ search: { min_query_length: 3 }, zones: { rings: [rings[0], { key: 'hiz_5_30', inner_ft: 5 }] } })
+
+    await expect(fetchServerConfig()).rejects.toThrow(
+      'Unexpected response from /api/config/: zones.rings[1].outer_ft: expected a number, got undefined',
+    )
+  })
+})
 
 describe('fetchSummary', () => {
   it('returns the checked summary, without unknown fields', async () => {

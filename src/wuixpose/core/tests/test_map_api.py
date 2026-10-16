@@ -4,7 +4,7 @@ import mapbox_vector_tile
 import pytest
 from django.urls import reverse
 
-from wuixpose.core import tiles, zones
+from wuixpose.core import assignment, tiles, zones
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import Structure, Tract, Zone
 
@@ -37,9 +37,9 @@ def loaded():
             point_feature(address_props("3", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="9"), 0.0003, 0.0002),
         ]
     )
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
     zones.build_zones()
-    boulder.link_address_tracts()
+    assignment.link_address_tracts()
     return {
         "tract": Tract.objects.get(identifiers__value="146100000001"),
         "structure": Structure.objects.get(),

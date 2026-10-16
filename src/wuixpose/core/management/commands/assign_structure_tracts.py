@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from wuixpose.core.ingest import boulder
+from wuixpose.core import assignment
 
 
 class Command(BaseCommand):
@@ -14,5 +14,5 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, full, **options):
-        result = boulder.assign_structure_tracts(full=full)
+        result = assignment.assign_structure_tracts(full=full)
         self.stdout.write(self.style.SUCCESS(f"{result}."))

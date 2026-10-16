@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from wuixpose.core import zones
+from wuixpose.core import assignment, zones
 from wuixpose.core.ingest import boulder
 from wuixpose.core.ingest.arcgis import ArcGISError
 
@@ -62,9 +62,9 @@ class Command(BaseCommand):
         # Not required for correctness (the next assign_structure_tracts and build_zones runs
         # would find these changes on their own), but keeps the map consistent as soon as the
         # ingest finishes.
-        assigned = boulder.assign_structure_tracts()
+        assigned = assignment.assign_structure_tracts()
         built = zones.build_zones()
         # Any layer can change which tract an address belongs to: new addresses, new parcel
         # numbers, or tract shapes moving under an address's point.
-        linked = boulder.link_address_tracts()
+        linked = assignment.link_address_tracts()
         self.stdout.write(self.style.SUCCESS(f"Done. {assigned}; {built}; {linked} address-tract links changed."))

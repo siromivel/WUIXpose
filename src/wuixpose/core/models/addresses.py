@@ -47,7 +47,7 @@ class Address(models.Model):
     # tract. Kept as published, so a parcel number we don't track yet can match later.
     county_fips = models.CharField(max_length=5, null=True, blank=True, db_collation="C")
     county_apn = models.CharField(max_length=64, null=True, blank=True, db_collation="C")
-    # Derived from county_apn, falling back to location (see ingest.boulder.link_address_tracts).
+    # Derived from county_apn, falling back to location (see assignment.link_address_tracts).
     tract = models.ForeignKey(
         "core.Tract",
         on_delete=models.SET_NULL,

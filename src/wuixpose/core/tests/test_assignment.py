@@ -10,6 +10,7 @@ import pytest
 from django.core.management import call_command
 from django.db import connection
 
+from wuixpose.core import assignment
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import JobRun, Structure, Tract
 
@@ -101,7 +102,7 @@ def load_two_lots_and_structures():
 def test_first_run_is_a_full_pass_and_is_recorded():
     load_two_lots_and_structures()
 
-    result = boulder.assign_structure_tracts()
+    result = assignment.assign_structure_tracts()
 
     assert (result.changed, result.full) == (2, True)
     run = JobRun.objects.get()
@@ -111,11 +112,11 @@ def test_first_run_is_a_full_pass_and_is_recorded():
 @transactional
 def test_a_tract_growing_onto_an_unchanged_structure_is_picked_up():
     load_two_lots_and_structures()
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
 
     # Lot A is redrawn to take in the gap; the structure there didn't change.
     boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.0018, 0.001))])
-    result = boulder.assign_structure_tracts()
+    result = assignment.assign_structure_tracts()
 
     a = Tract.objects.get(identifiers__value="A").pk
     assert (result.changed, result.full) == (1, False)
@@ -125,11 +126,11 @@ def test_a_tract_growing_onto_an_unchanged_structure_is_picked_up():
 @transactional
 def test_a_tract_shrinking_away_from_an_unchanged_structure_is_picked_up():
     load_two_lots_and_structures()
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
 
     # Lot B shrinks to its east half, leaving its structure outside it.
     boulder.load_tracts([feature({"PARCEL_NO": "B"}, box(0.0025, 0, 0.003, 0.001))])
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
 
     assert tract_of()["on-b"] is None
 
@@ -137,10 +138,10 @@ def test_a_tract_shrinking_away_from_an_unchanged_structure_is_picked_up():
 @transactional
 def test_a_moved_structure_is_picked_up():
     load_two_lots_and_structures()
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
 
     boulder.load_structures([feature({"StructureID": "between"}, box(0.0022, 0.0003, 0.0023, 0.0004))])
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
 
     assert tract_of()["between"] == Tract.objects.get(identifiers__value="B").pk
 
@@ -148,15 +149,15 @@ def test_a_moved_structure_is_picked_up():
 @transactional
 def test_incremental_runs_leave_unchanged_structures_alone_and_full_runs_do_not():
     load_two_lots_and_structures()
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
     on_a = Structure.objects.get(source_id="on-a")
     b = Tract.objects.get(identifiers__value="B").pk
     set_tract_without_touching_geometry(on_a.pk, b)
 
-    assert boulder.assign_structure_tracts().changed == 0
+    assert assignment.assign_structure_tracts().changed == 0
     assert tract_of()["on-a"] == b
 
-    assert boulder.assign_structure_tracts(full=True).changed == 1
+    assert assignment.assign_structure_tracts(full=True).changed == 1
     assert tract_of()["on-a"] == Tract.objects.get(identifiers__value="A").pk
 
 
@@ -180,7 +181,7 @@ def test_assign_command_reports_scope():
 def test_watermark_is_the_jobs_transaction_start():
     load_two_lots_and_structures()
 
-    boulder.assign_structure_tracts()
+    assignment.assign_structure_tracts()
 
     # Every structure was written before the job's transaction began.
     run = JobRun.objects.get()

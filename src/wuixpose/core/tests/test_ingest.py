@@ -7,6 +7,7 @@ import pytest
 from django.core.management import CommandError, call_command
 from django.utils import timezone
 
+from wuixpose.core import assignment
 from wuixpose.core.ingest import arcgis, boulder
 from wuixpose.core.ingest.geometry import UnreadableGeometry, multipolygon_from_geojson
 from wuixpose.core.models import Address, RejectedFeature, Structure, Tract
@@ -295,12 +296,12 @@ def test_structures_are_assigned_to_the_tract_holding_their_footprint():
     )
     apns = current_apns()
 
-    result = boulder.assign_structure_tracts()
+    result = assignment.assign_structure_tracts()
 
     tract_of = dict(Structure.objects.values_list("source_id", "tract_id"))
     assert tract_of == {"inside-a": apns["A"], "mostly-a": apns["A"], "straddles": None, "outside": None}
     assert result.changed == 2
-    assert boulder.assign_structure_tracts().changed == 0
+    assert assignment.assign_structure_tracts().changed == 0
 
 
 # Management command

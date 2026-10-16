@@ -1,6 +1,7 @@
 import pytest
 from django.urls import reverse
 
+from wuixpose.core import assignment
 from wuixpose.core.display import address_line1
 from wuixpose.core.ingest import boulder
 from wuixpose.core.models import Address
@@ -172,7 +173,7 @@ def test_search_api(client):
     boulder.load_addresses(
         [point_feature(address_props("1", "1172", "VALLEY", "A", STREETTYPE="LN", ZIPCODE="80302"), 0.0005, 0.0005)]
     )
-    boulder.link_address_tracts()
+    assignment.link_address_tracts()
     address = Address.objects.get()
 
     data = client.get(reverse("search"), {"q": "1172 valley"}).json()

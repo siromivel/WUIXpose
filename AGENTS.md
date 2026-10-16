@@ -86,7 +86,7 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - Business logic goes in plain service functions, not in views, model methods or management
   commands. Commands stay thin wrappers (see `build_zones`).
 - Service functions live in feature modules under `core/`: `zones.py`, `tiles.py`, `search.py`,
-  `display.py`, `ingest/`.
+  `display.py`, `assignment.py`, `jobs.py`, `ingest/`.
   Add a new module for a new feature rather than growing an unrelated one.
 - Imports follow layers: `constants.py` → `models/` → services → `api.py`, `tiles.py`, `views.py`
   and commands. Import only from layers below, never above, so modules can't form import cycles
@@ -97,6 +97,7 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
   - Models import only `constants.py` and each other, never a service, not even for `__str__`.
   - Deployment settings that differ between environments go in settings/env instead, never
     domain facts that must match stored data (an SRID, a ring distance).
+- Jobs that process changes since their last run use `jobs.incremental_run` (see `build_zones`).
 - Use the ORM. Raw SQL only when GeoDjango can't express a PostGIS query,
   and always parameterized, never string-formatted.
 - Avoid N+1 queries: use `select_related` / `prefetch_related` when iterating relations.

@@ -195,6 +195,8 @@ src/wuixpose/
   core/     models (tracts, structures, addresses, zones), migrations
     constants.py  SRIDs, unit conversions and other values shared across modules
     ingest/   ArcGIS REST client, geometry cleanup, Boulder County loaders
+    assignment.py  linking structures and addresses to tracts
+    jobs.py   incremental job runs (watermarks, JobRun)
     zones.py  ring definitions and the job that draws them
     tiles.py  vector tiles
     search.py address normalization and search

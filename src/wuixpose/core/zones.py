@@ -6,9 +6,8 @@ so tiles and anything that later measures a zone read polygons rather than rebui
 
 from dataclasses import dataclass
 
-from django.db import connection, transaction
-
 from wuixpose.core.constants import M_PER_FT
+from wuixpose.core.jobs import incremental_run
 from wuixpose.core.models import JobRun
 
 
@@ -90,31 +89,17 @@ def build_zones(*, full: bool = False) -> BuildResult:
     at this rule version, are redrawn; a changed footprint's zones are updated in place. The first
     run, and any run with `full`, redraws every structure.
     """
-    job = JobRun.Job.BUILD_ZONES
-    with transaction.atomic(), connection.cursor() as cursor:
-        # One run at a time, so two runs can't interleave their watermarks.
-        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [job])
-        # The transaction's start, the same clock the geom_updated_at trigger stamps with.
-        cursor.execute("SELECT now()")
-        row = cursor.fetchone()
-        assert row is not None  # now() always returns a row
-        (started_at,) = row
-        since = (
-            None
-            if full
-            else JobRun.objects.filter(job=job).order_by("-started_at").values_list("started_at", flat=True).first()
-        )
-        candidates = _ALL_CANDIDATES if since is None else _CHANGED_CANDIDATES
-        cursor.execute(
+    with incremental_run(JobRun.Job.BUILD_ZONES, full=full) as run:
+        candidates = _ALL_CANDIDATES if run.full else _CHANGED_CANDIDATES
+        run.cursor.execute(
             _BUILD.format(candidates=candidates),
             {
-                "since": since,
+                "since": run.since,
                 "rule_version": RULE_VERSION,
                 "keys": [ring.key for ring in RINGS],
                 "inner_m": [ring.inner_ft * M_PER_FT for ring in RINGS],
                 "outer_m": [ring.outer_ft * M_PER_FT for ring in RINGS],
             },
         )
-        result = BuildResult(changed=cursor.rowcount, full=since is None)
-        JobRun.objects.create(job=job, started_at=started_at, full=result.full, rows_changed=result.changed)
-    return result
+        run.rows_changed = run.cursor.rowcount
+    return BuildResult(changed=run.rows_changed, full=run.full)

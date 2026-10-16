@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 from django.contrib.gis.geos import Point
 
+from wuixpose.core import assignment
 from wuixpose.core.constants import STORAGE_SRID
 from wuixpose.core.ingest import boulder
 from wuixpose.core.ingest.geometry import point_from_geojson
@@ -235,11 +236,11 @@ def test_addresses_link_to_the_tract_carrying_their_parcel_number(lots):
         ]
     )
 
-    changed = boulder.link_address_tracts()
+    changed = assignment.link_address_tracts()
 
     assert tract_of() == {"on-a": lots["A"], "driveway": lots["A"], "condo": lots["C2"]}
     assert changed == 3
-    assert boulder.link_address_tracts() == 0
+    assert assignment.link_address_tracts() == 0
 
 
 @pytest.mark.django_db
@@ -255,7 +256,7 @@ def test_addresses_without_a_known_parcel_number_fall_back_to_location(lots):
         ]
     )
 
-    boulder.link_address_tracts()
+    assignment.link_address_tracts()
 
     assert tract_of() == {"stale": lots["B"], "no-apn": lots["A"], "stacked": None, "nowhere": None}
 
@@ -263,11 +264,11 @@ def test_addresses_without_a_known_parcel_number_fall_back_to_location(lots):
 @pytest.mark.django_db
 def test_address_links_follow_parcel_numbers_loaded_later():
     boulder.load_addresses([point_feature(address_props("1", "1", "MAIN", "A"), 0.0005, 0.0005)])
-    boulder.link_address_tracts()
+    assignment.link_address_tracts()
     assert tract_of() == {"1": None}
 
     boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))])
-    boulder.link_address_tracts()
+    assignment.link_address_tracts()
 
     assert tract_of() == {"1": TractIdentifier.objects.get().tract_id}
 
@@ -275,12 +276,12 @@ def test_address_links_follow_parcel_numbers_loaded_later():
 @pytest.mark.django_db
 def test_retired_addresses_keep_their_last_tract(lots):
     boulder.load_addresses([point_feature(address_props("1", "1", "MAIN", "A"), 0.0005, 0.0005)])
-    boulder.link_address_tracts()
+    assignment.link_address_tracts()
     boulder.load_addresses([], complete=True)
 
     # Parcel number A moves to lot B, which a current address carrying it would follow.
     TractIdentifier.objects.filter(value="A").update(value="A-OLD")
     TractIdentifier.objects.filter(value="B").update(value="A")
-    assert boulder.link_address_tracts() == 0
+    assert assignment.link_address_tracts() == 0
 
     assert tract_of() == {"1": lots["A"]}

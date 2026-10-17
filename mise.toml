@@ -54,6 +54,18 @@ run = [
   "npm --prefix frontend run format",
 ]
 
+[tasks.format-file]
+description = "Format one Python or frontend file (Claude Code's hook runs this after each edit)"
+usage = 'arg "<file>"'
+# Formats only, without format's lint fixes: an import added an edit before the code that uses it
+# would otherwise be removed as unused.
+run = '''
+case "$usage_file" in
+  "{{config_root}}"/frontend/*) npm --prefix frontend run --silent format -- --no-error-on-unmatched-pattern "$usage_file" ;;
+  *.py|*.pyi) uv run --quiet ruff format --force-exclude "$usage_file" ;;
+esac
+'''
+
 [tasks.typecheck]
 description = "Type-check Python"
 run = "uv run pyright"

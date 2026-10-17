@@ -29,7 +29,7 @@ database when they need it.
   `frontend-check`, `frontend-test`
 - Format: `mise run format` (ruff's safe lint fixes, then ruff and oxfmt). A hook that reformats or fixes files fails the
   commit; stage its changes and commit again. In Claude Code, a hook in `.claude/settings.json`
-  formats each file after you edit it, so don't format by hand.
+  formats each file after you edit it (`mise run format-file`), so don't format by hand.
 - CI runs these same tasks. To add a check, add a mise task and call it from
   `.github/workflows/ci.yaml`; don't inline commands in the workflow. If it should also run as a
   git hook, add a `local` hook with `entry: mise run <task>` and the task's name as its id (never

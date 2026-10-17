@@ -212,9 +212,10 @@ fixes files fails the commit; review and stage its changes, then commit again.
 `uv run pre-commit run -a` runs the commit hooks over every file. `git commit --no-verify` skips
 them, but CI still runs every check.
 
-Claude Code sessions also format each Python or frontend file right after editing it (a hook in
-`.claude/settings.json`, the one shared file under `.claude/`; personal settings go in
-`.claude/settings.local.json`, which git ignores).
+Claude Code sessions also format each Python or frontend file right after editing it, with
+`mise run format-file <file>` (a hook in `.claude/settings.json`, the one shared file under
+`.claude/`; personal settings go in `.claude/settings.local.json`, which git ignores). Unlike
+`format`, it skips the lint fixes, which would remove an import added before the code that uses it.
 
 `git blame` skips commits that only reformat code, listed in `.git-blame-ignore-revs`. GitHub reads
 the file on its own; `mise run setup` also points your local git at it.

@@ -68,12 +68,7 @@ function byRing<T extends string | number>(
   fallback: T,
 ): ExpressionSpecification {
   return rings.reduceRight<ExpressionSpecification>(
-    (otherwise, ring, i) => [
-      'case',
-      ['==', ['get', 'ring_key'], ring.key],
-      value(ring, i),
-      otherwise,
-    ],
+    (otherwise, ring, i) => ['case', ['==', ['get', 'ring_key'], ring.key], value(ring, i), otherwise],
     ['literal', fallback],
   )
 }
@@ -215,16 +210,7 @@ function featureId(selection: NonNullable<Selection>): FeatureIdentifier {
   return { source: layer, sourceLayer: layer, id: selection.id }
 }
 
-export function MapView({
-  initialBbox,
-  tileSources,
-  zoneRings,
-  visible,
-  focus,
-  selection,
-  onSelect,
-  onZoom,
-}: Props) {
+export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, selection, onSelect, onZoom }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   // Only the first values matter: they set the opening view, the sources and their styling.
@@ -257,11 +243,7 @@ export function MapView({
 
     let usingPlainStyle = false
     instance.on('error', (event) => {
-      if (
-        !usingPlainStyle &&
-        !instance.loaded() &&
-        String(event.error?.message).includes(config.basemapStyle)
-      ) {
+      if (!usingPlainStyle && !instance.loaded() && String(event.error?.message).includes(config.basemapStyle)) {
         console.warn('Basemap unavailable, falling back to a plain background')
         usingPlainStyle = true
         instance.setStyle(PLAIN_STYLE)
@@ -333,8 +315,7 @@ export function MapView({
 
   // Keep the zoom if already closer in.
   useEffect(() => {
-    if (map && focus)
-      map.flyTo({ center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), FOCUS_ZOOM) })
+    if (map && focus) map.flyTo({ center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), FOCUS_ZOOM) })
   }, [map, focus])
 
   return <div ref={container} className="map" />

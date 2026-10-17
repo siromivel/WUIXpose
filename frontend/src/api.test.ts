@@ -1,12 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  fetchServerConfig,
-  fetchStructure,
-  fetchSummary,
-  fetchTileJson,
-  searchAddresses,
-} from './api'
+import { fetchServerConfig, fetchStructure, fetchSummary, fetchTileJson, searchAddresses } from './api'
 import { InvalidData } from './validate'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -88,9 +82,7 @@ describe('fetchSummary', () => {
     respondWith({ tract_count: 0, structure_count: 0, address_count: 0, bbox: [1, 2, 3] })
 
     await expect(fetchSummary()).rejects.toThrow(
-      new InvalidData(
-        'Unexpected response from /api/summary/: bbox: expected 4 numbers, got an array',
-      ),
+      new InvalidData('Unexpected response from /api/summary/: bbox: expected 4 numbers, got an array'),
     )
   })
 
@@ -147,9 +139,7 @@ describe('searchAddresses', () => {
   it('requires the tract key on each result', async () => {
     respondWith({ results: [address] })
 
-    await expect(searchAddresses('valley')).rejects.toThrow(
-      'results[0].tract: expected a number, got undefined',
-    )
+    await expect(searchAddresses('valley')).rejects.toThrow('results[0].tract: expected a number, got undefined')
   })
 })
 

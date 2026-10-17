@@ -19,9 +19,7 @@ export type Bbox = [minLon: number, minLat: number, maxLon: number, maxLat: numb
 
 const bbox: Check<Bbox> = (value, path) => {
   const values = array(number)(value, path)
-  return values.length === 4
-    ? [values[0], values[1], values[2], values[3]]
-    : fail(path, '4 numbers', value)
+  return values.length === 4 ? [values[0], values[1], values[2], values[3]] : fail(path, '4 numbers', value)
 }
 
 // A ring drawn around each structure, as distances from its footprint (RINGS in core/zones.py).
@@ -107,31 +105,23 @@ async function getJson<T>(path: string, check: Check<T>, signal?: AbortSignal): 
   try {
     return check(body, '')
   } catch (err) {
-    if (err instanceof InvalidData)
-      throw new InvalidData(`Unexpected response from ${path}: ${err.message}`)
+    if (err instanceof InvalidData) throw new InvalidData(`Unexpected response from ${path}: ${err.message}`)
     throw err
   }
 }
 
-export const fetchServerConfig = (signal?: AbortSignal) =>
-  getJson('/api/config/', serverConfig, signal)
+export const fetchServerConfig = (signal?: AbortSignal) => getJson('/api/config/', serverConfig, signal)
 
 export const fetchSummary = (signal?: AbortSignal) => getJson('/api/summary/', summary, signal)
 
-export const fetchTract = (id: number, signal?: AbortSignal) =>
-  getJson(`/api/tracts/${id}/`, tractDetail, signal)
+export const fetchTract = (id: number, signal?: AbortSignal) => getJson(`/api/tracts/${id}/`, tractDetail, signal)
 
 export const fetchStructure = (id: number, signal?: AbortSignal) =>
   getJson(`/api/structures/${id}/`, structureDetail, signal)
 
-export async function searchAddresses(
-  query: string,
-  signal?: AbortSignal,
-): Promise<SearchResult[]> {
+export async function searchAddresses(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   const params = new URLSearchParams({ q: query })
-  return (await getJson(`/api/search/?${params}`, object({ results: array(searchResult) }), signal))
-    .results
+  return (await getJson(`/api/search/?${params}`, object({ results: array(searchResult) }), signal)).results
 }
 
-export const fetchTileJson = (layer: string, signal?: AbortSignal) =>
-  getJson(`/tiles/${layer}.json`, tileJson, signal)
+export const fetchTileJson = (layer: string, signal?: AbortSignal) => getJson(`/tiles/${layer}.json`, tileJson, signal)

@@ -11,14 +11,7 @@ import {
   fetchStructure,
   fetchTract,
 } from './api'
-import {
-  type LayerVisibility,
-  type Selection,
-  type TileSources,
-  zoneColor,
-  zoneLabel,
-  zoneRange,
-} from './layers'
+import { type LayerVisibility, type Selection, type TileSources, zoneColor, zoneLabel, zoneRange } from './layers'
 
 interface Props {
   serverConfig: ServerConfig | null
@@ -58,16 +51,11 @@ export function Panel({
     <aside className="panel">
       <header>
         <h1>WUIXpose</h1>
-        <p className="subtitle">
-          Wildfire mitigation assessment for homes in the wildland-urban interface
-        </p>
+        <p className="subtitle">Wildfire mitigation assessment for homes in the wildland-urban interface</p>
       </header>
 
       <section>
-        <AddressSearch
-          minQueryLength={serverConfig?.search.min_query_length ?? null}
-          onPick={onPickAddress}
-        />
+        <AddressSearch minQueryLength={serverConfig?.search.min_query_length ?? null} onPick={onPickAddress} />
       </section>
 
       <section>
@@ -130,10 +118,7 @@ export function Panel({
         ) : selection.kind === 'tract' ? (
           <TractCard id={selection.id} />
         ) : (
-          <StructureCard
-            id={selection.id}
-            onSelectTract={(id) => onSelect({ kind: 'tract', id })}
-          />
+          <StructureCard id={selection.id} onSelectTract={(id) => onSelect({ kind: 'tract', id })} />
         )}
       </section>
     </aside>

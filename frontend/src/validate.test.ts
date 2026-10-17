@@ -1,16 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import {
-  type Checked,
-  InvalidData,
-  array,
-  nullable,
-  number,
-  object,
-  optional,
-  record,
-  string,
-} from './validate'
+import { type Checked, InvalidData, array, nullable, number, object, optional, record, string } from './validate'
 
 describe('number', () => {
   it('accepts finite numbers', () => {
@@ -122,9 +112,7 @@ describe('object', () => {
   })
 
   it('returns only the keys in the shape', () => {
-    expect(
-      check({ id: 1, name: null, tags: [{ label: 'a', extra: true }], extra: 'dropped' }, ''),
-    ).toEqual({
+    expect(check({ id: 1, name: null, tags: [{ label: 'a', extra: true }], extra: 'dropped' }, '')).toEqual({
       id: 1,
       name: null,
       tags: [{ label: 'a' }],
@@ -138,9 +126,7 @@ describe('object', () => {
   })
 
   it('reports a missing key as undefined', () => {
-    expect(() => check({ name: null, tags: [] }, '')).toThrow(
-      'id: expected a number, got undefined',
-    )
+    expect(() => check({ name: null, tags: [] }, '')).toThrow('id: expected a number, got undefined')
   })
 
   it('rejects arrays and null', () => {

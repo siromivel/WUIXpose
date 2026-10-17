@@ -26,9 +26,7 @@ async function loadAppData(signal: AbortSignal): Promise<AppData> {
     fetchSummary(signal),
     ...TILE_LAYERS.map((layer) => fetchTileJson(layer, signal)),
   ])
-  const tileSources = Object.fromEntries(
-    TILE_LAYERS.map((layer, i) => [layer, tileJsons[i]]),
-  ) as TileSources
+  const tileSources = Object.fromEntries(TILE_LAYERS.map((layer, i) => [layer, tileJsons[i]])) as TileSources
   return { serverConfig, summary, tileSources }
 }
 

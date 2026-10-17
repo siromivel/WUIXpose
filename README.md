@@ -137,7 +137,10 @@ mise run dev-frontend    # http://localhost:5173
 ```
 
 Lot lines appear from zoom 12, structures from zoom 13 and zones from zoom 15. The search box in
-the panel finds an address, flies the map there and selects its lot.
+the panel finds an address, flies the map there and selects its lot. The location button (top
+right) centers the map on you and follows as you move; panning away stops following. Browsers
+allow location only on `localhost` or HTTPS, so it won't work from a phone on the LAN over plain
+`http://<ip>:5173`.
 
 ## API
 

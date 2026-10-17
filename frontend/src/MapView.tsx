@@ -2,6 +2,7 @@ import {
   type ExpressionSpecification,
   type FeatureIdentifier,
   type FilterSpecification,
+  GeolocateControl,
   type MapGeoJSONFeature,
   Map as MapLibreMap,
   NavigationControl,
@@ -239,6 +240,16 @@ export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, s
       ...(bbox ? { bounds: bbox, fitBoundsOptions: { padding: 40, maxZoom: 15 } } : {}),
     })
     instance.addControl(new NavigationControl({ visualizePitch: false }), 'top-right')
+    instance.addControl(
+      new GeolocateControl({
+        // GPS rather than Wi-Fi or IP: in the field, the difference between houses matters.
+        positionOptions: { enableHighAccuracy: true },
+        // Follow the user as they walk a property; panning away stops following.
+        trackUserLocation: true,
+        fitBoundsOptions: { maxZoom: FOCUS_ZOOM },
+      }),
+      'top-right',
+    )
     instance.addControl(new ScaleControl({ unit: 'imperial' }), 'bottom-right')
 
     let usingPlainStyle = false

@@ -108,9 +108,7 @@ def test_reloading_addresses_updates_in_place():
     boulder.load_addresses([point_feature(address_props("1", "12", "MAIN", STREETTYPE="ST"), 0, 0)])
     first = Address.objects.get()
 
-    result = boulder.load_addresses(
-        [point_feature(address_props("1", "14", "MAIN", STREETTYPE="ST"), 0.0001, 0)]
-    )
+    result = boulder.load_addresses([point_feature(address_props("1", "14", "MAIN", STREETTYPE="ST"), 0.0001, 0)])
 
     assert (result.created, result.updated) == (0, 1)
     first.refresh_from_db()
@@ -138,11 +136,7 @@ def tracked() -> dict[str | None, tuple[date, date | None]]:
 
 @pytest.mark.django_db
 def test_reloading_unchanged_addresses_writes_nothing():
-    features = [
-        point_feature(
-            address_props("1", "12", "MAIN", "A", STREETTYPE="ST", CITY="LONGMONT"), 0.0001, 0
-        )
-    ]
+    features = [point_feature(address_props("1", "12", "MAIN", "A", STREETTYPE="ST", CITY="LONGMONT"), 0.0001, 0)]
     boulder.load_addresses(features)
 
     result = boulder.load_addresses(features)

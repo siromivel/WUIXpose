@@ -56,12 +56,8 @@ def test_each_ring_spans_its_distances_from_the_footprint():
     for ring in zones.RINGS:
         (polygon,) = geoms[ring.key].transform(UTM_13N, clone=True)
         outer_edge, inner_edge = polygon  # a ring is one polygon with one hole
-        assert feet_from(footprint, outer_edge) == pytest.approx(
-            [ring.outer_ft] * len(outer_edge), rel=0.005
-        )
-        assert feet_from(footprint, inner_edge) == pytest.approx(
-            [ring.inner_ft] * len(inner_edge), abs=0.05
-        )
+        assert feet_from(footprint, outer_edge) == pytest.approx([ring.outer_ft] * len(outer_edge), rel=0.005)
+        assert feet_from(footprint, inner_edge) == pytest.approx([ring.inner_ft] * len(inner_edge), abs=0.05)
 
 
 @pytest.mark.django_db

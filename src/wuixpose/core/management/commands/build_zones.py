@@ -4,9 +4,7 @@ from wuixpose.core import zones
 
 
 class Command(BaseCommand):
-    help = (
-        "Draw zones around structures, redrawing those whose footprint changed since the last run."
-    )
+    help = "Draw zones around structures, redrawing those whose footprint changed since the last run."
 
     def add_arguments(self, parser):
         parser.add_argument(

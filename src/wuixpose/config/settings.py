@@ -33,9 +33,7 @@ else:
     try:
         SECRET_KEY = env.str("DJANGO_SECRET_KEY")
     except ImproperlyConfigured as exc:
-        raise ImproperlyConfigured(
-            "Set DJANGO_SECRET_KEY, or DJANGO_DEBUG=true for local development"
-        ) from exc
+        raise ImproperlyConfigured("Set DJANGO_SECRET_KEY, or DJANGO_DEBUG=true for local development") from exc
 
 # django-environ leaves list()'s default unannotated, so pyright infers it can only be NOTSET.
 ALLOWED_HOSTS = env.list(

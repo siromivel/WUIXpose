@@ -30,7 +30,9 @@ MVT_CONTENT_TYPE = "application/vnd.mapbox-vector-tile"
 # Placeholders for layer SQL, filled from render_tile's parameters. Every non-geometry column a
 # layer selects becomes a tile property.
 ENVELOPE_STORAGE = "ST_Transform(ST_TileEnvelope(%(z)s, %(x)s, %(y)s), %(storage_srid)s)"
-MVT_GEOM = "ST_AsMVTGeom(ST_Transform({col}, %(web_mercator_srid)s), ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4096, 64, true)"
+MVT_GEOM = (
+    "ST_AsMVTGeom(ST_Transform({col}, %(web_mercator_srid)s), ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4096, 64, true)"
+)
 
 
 @dataclass(frozen=True)

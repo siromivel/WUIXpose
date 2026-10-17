@@ -67,6 +67,4 @@ class Command(BaseCommand):
         # Any layer can change which tract an address belongs to: new addresses, new parcel
         # numbers, or tract shapes moving under an address's point.
         linked = assignment.link_address_tracts()
-        self.stdout.write(
-            self.style.SUCCESS(f"Done. {assigned}; {built}; {linked} address-tract links changed.")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Done. {assigned}; {built}; {linked} address-tract links changed."))

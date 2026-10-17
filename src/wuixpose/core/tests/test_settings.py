@@ -11,9 +11,7 @@ def load_settings(**env_overrides: str) -> subprocess.CompletedProcess:
     # Point away from any local .env so only the variables given here count.
     env |= {"DJANGO_SETTINGS_MODULE": "wuixpose.config.settings", "DJANGO_ENV_FILE": "/nonexistent"}
     env |= env_overrides
-    return subprocess.run(
-        [sys.executable, "-c", LOAD_SETTINGS], env=env, capture_output=True, text=True, check=False
-    )
+    return subprocess.run([sys.executable, "-c", LOAD_SETTINGS], env=env, capture_output=True, text=True, check=False)
 
 
 def test_production_mode_requires_a_secret_key():
@@ -36,8 +34,6 @@ def test_debug_mode_runs_without_a_secret_key():
 
 
 def test_allowed_hosts_from_environment():
-    result = load_settings(
-        DJANGO_DEBUG="false", DJANGO_SECRET_KEY="x" * 50, DJANGO_ALLOWED_HOSTS="a.example,b.example"
-    )
+    result = load_settings(DJANGO_DEBUG="false", DJANGO_SECRET_KEY="x" * 50, DJANGO_ALLOWED_HOSTS="a.example,b.example")
 
     assert result.stdout.strip() == "False ['a.example', 'b.example']"

@@ -40,5 +40,5 @@ python_files = ["tests.py", "test_*.py"]
 
 [tool.ruff]
 extend-exclude = ["**/migrations/*"]
-# Matches the frontend's oxfmt width and the wrap of comments and docs.
-line-length = 100
+# Matches the frontend's oxfmt printWidth.
+line-length = 120

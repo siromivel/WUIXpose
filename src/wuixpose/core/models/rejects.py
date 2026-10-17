@@ -32,9 +32,7 @@ class RejectedFeature(models.Model):
     last_seen_at = models.DateTimeField()
 
     class Meta:
-        constraints = (
-            models.UniqueConstraint(fields=("layer", "feature_hash"), name="uniq_rejected_feature"),
-        )
+        constraints = (models.UniqueConstraint(fields=("layer", "feature_hash"), name="uniq_rejected_feature"),)
 
     def __str__(self) -> str:
         return f"{self.layer}:{self.source_id or '?'} ({self.reason})"

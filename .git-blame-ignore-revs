@@ -4,3 +4,6 @@
 
 # Format Python with ruff and the frontend with oxfmt
 2d5fe4c9500d65451b9439632abc70d46c3dec55
+
+# Widen the frontend's printWidth to 120
+741c7fd71d70c762e668d37579d682f01ee9828b

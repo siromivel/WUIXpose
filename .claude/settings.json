@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); [ -n \"$f\" ] && mise -C \"$CLAUDE_PROJECT_DIR\" run --quiet format-file \"$f\" >/dev/null 2>&1 || true",
+            "statusMessage": "Formatting"
+          }
+        ]
+      }
+    ]
+  }
+}

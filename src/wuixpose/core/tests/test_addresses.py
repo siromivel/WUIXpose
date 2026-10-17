@@ -37,7 +37,16 @@ def test_load_addresses_normalizes_county_fields():
                 0.0001,
             ),
             point_feature(
-                address_props("101", "2211", "PRATT", None, STREETTYPE="ST", UNIT="206", CITY="LONGMONT", ZIPCODE=" "),
+                address_props(
+                    "101",
+                    "2211",
+                    "PRATT",
+                    None,
+                    STREETTYPE="ST",
+                    UNIT="206",
+                    CITY="LONGMONT",
+                    ZIPCODE=" ",
+                ),
                 0.0002,
                 0.0001,
             ),
@@ -47,7 +56,11 @@ def test_load_addresses_normalizes_county_fields():
     assert (result.created, result.updated, result.skipped) == (2, 0, 0)
     rural, town = Address.objects.order_by("source_id")
     assert (rural.number, rural.street, rural.unit) == ("1172", "VALLEY LN", "APT 2")
-    assert (rural.jurisdiction, rural.state, rural.zip_code) == ("UNINCORPORATED BOULDER COUNTY", "CO", "80302")
+    assert (rural.jurisdiction, rural.state, rural.zip_code) == (
+        "UNINCORPORATED BOULDER COUNTY",
+        "CO",
+        "80302",
+    )
     assert (rural.county_fips, rural.county_apn) == ("08013", "146102000067")
     assert rural.geom.equals(Point(ORIGIN[0] + 0.0001, ORIGIN[1] + 0.0001, srid=STORAGE_SRID))
     assert (town.unit, town.zip_code) == ("#206", "")
@@ -62,7 +75,11 @@ def test_unusable_address_points_are_skipped_and_recorded():
             point_feature(address_props("2", "12", " "), 0, 0),
             point_feature(address_props(None, "12", "MAIN"), 0, 0),
             {"type": "Feature", "geometry": None, "properties": address_props("3", "12", "MAIN")},
-            {"type": "Feature", "geometry": {"type": "Point"}, "properties": address_props("4", "12", "MAIN")},
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point"},
+                "properties": address_props("4", "12", "MAIN"),
+            },
         ]
     )
 
@@ -175,7 +192,11 @@ def test_a_complete_load_retires_addresses_missing_from_it():
     boulder.load_addresses([active("1"), active("2"), active("3")], as_of=JAN_1)
 
     # 2 is gone from the layer; 3 is still there but its point is unreadable this time.
-    unreadable = {"type": "Feature", "geometry": {"type": "Point"}, "properties": address_props("3", "12", "MAIN")}
+    unreadable = {
+        "type": "Feature",
+        "geometry": {"type": "Point"},
+        "properties": address_props("3", "12", "MAIN"),
+    }
     result = boulder.load_addresses([active("1"), unreadable], as_of=FEB_1, complete=True)
 
     assert (result.unchanged, result.retired, result.skipped) == (1, 1, 1)

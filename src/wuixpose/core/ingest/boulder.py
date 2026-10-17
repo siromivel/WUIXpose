@@ -75,7 +75,15 @@ def fetch_footprints(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, A
 
 
 # Address point fields that make up the street name, in the order they're written.
-STREET_FIELDS = ("PREFIX", "PREMODIFIER", "PRETYPE", "STREETNAME", "STREETTYPE", "SUFFIX", "POSTMODIFIER")
+STREET_FIELDS = (
+    "PREFIX",
+    "PREMODIFIER",
+    "PRETYPE",
+    "STREETNAME",
+    "STREETTYPE",
+    "SUFFIX",
+    "POSTMODIFIER",
+)
 
 
 def fetch_addresses(bbox: Bbox | None = None, **kwargs) -> Iterable[dict[str, Any]]:
@@ -301,7 +309,15 @@ def load_addresses(
         try:
             geom = point_from_geojson(feature.get("geometry"))
         except UnreadableGeometry as exc:
-            rejected.append(rejects.reject(layer, feature, Reason.UNREADABLE_GEOMETRY, source_id=address_id, detail=str(exc)))
+            rejected.append(
+                rejects.reject(
+                    layer,
+                    feature,
+                    Reason.UNREADABLE_GEOMETRY,
+                    source_id=address_id,
+                    detail=str(exc),
+                )
+            )
             continue
         if geom is None:
             rejected.append(rejects.reject(layer, feature, Reason.NOT_A_POINT, source_id=address_id))
@@ -346,6 +362,8 @@ def load_addresses(
         )
         result.created = len(created)
 
-        gone = ours.current().exclude(source_id__in=present) if complete else ours.current().filter(source_id__in=retired)
+        gone = (
+            ours.current().exclude(source_id__in=present) if complete else ours.current().filter(source_id__in=retired)
+        )
         result.retired = gone.update(tracked_to=as_of)
     return result

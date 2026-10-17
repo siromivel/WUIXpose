@@ -86,7 +86,12 @@ const tileJson = object({
   maxzoom: number,
   attribution: optional(string),
   vector_layers: array(
-    object({ id: string, fields: record(string), minzoom: optional(number), maxzoom: optional(number) }),
+    object({
+      id: string,
+      fields: record(string),
+      minzoom: optional(number),
+      maxzoom: optional(number),
+    }),
   ),
 })
 export type TileJSON = Checked<typeof tileJson>

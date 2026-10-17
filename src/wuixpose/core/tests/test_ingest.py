@@ -72,7 +72,16 @@ def test_iter_features_checks_the_count_when_asked():
     server = FakeServer(features, page_size=2)
     bbox = (-105.5, 40.0, -105.3, 40.1)
 
-    got = list(arcgis.iter_features("https://gis.example/Layer/0", where="X = 1", bbox=bbox, page_size=2, check_count=True, fetch=server))
+    got = list(
+        arcgis.iter_features(
+            "https://gis.example/Layer/0",
+            where="X = 1",
+            bbox=bbox,
+            page_size=2,
+            check_count=True,
+            fetch=server,
+        )
+    )
 
     assert len(got) == 5
     _, count_params = server.requests[0]
@@ -255,7 +264,9 @@ def test_unusable_features_are_skipped_and_recorded(caplog):
     assert rows["unclosed"].layer == RejectedFeature.Layer.BOCO_FOOTPRINTS
     assert rows["unclosed"].feature == features[1]
     assert rows["unclosed"].detail
-    (warning,) = [r for r in caplog.records if r.name == "wuixpose.core.ingest.rejects" and r.levelno == logging.WARNING]
+    (warning,) = [
+        r for r in caplog.records if r.name == "wuixpose.core.ingest.rejects" and r.levelno == logging.WARNING
+    ]
     assert "unclosed" in warning.getMessage()
 
 
@@ -299,7 +310,12 @@ def test_structures_are_assigned_to_the_tract_holding_their_footprint():
     result = assignment.assign_structure_tracts()
 
     tract_of = dict(Structure.objects.values_list("source_id", "tract_id"))
-    assert tract_of == {"inside-a": apns["A"], "mostly-a": apns["A"], "straddles": None, "outside": None}
+    assert tract_of == {
+        "inside-a": apns["A"],
+        "mostly-a": apns["A"],
+        "straddles": None,
+        "outside": None,
+    }
     assert result.changed == 2
     assert assignment.assign_structure_tracts().changed == 0
 
@@ -343,7 +359,12 @@ def test_ingest_command_retires_missing_addresses_only_without_a_bbox(monkeypatc
     boulder.load_addresses([point_feature(address_props("gone", "12", "MAIN"), 0, 0)])
     monkeypatch.setattr(boulder, "fetch_addresses", lambda bbox, **kwargs: [])
 
-    call_command("ingest_boulder", "--layer=addresses", *([f"--bbox={bbox}"] if bbox else []), stdout=io.StringIO())
+    call_command(
+        "ingest_boulder",
+        "--layer=addresses",
+        *([f"--bbox={bbox}"] if bbox else []),
+        stdout=io.StringIO(),
+    )
 
     assert (Address.objects.get().tracked_to is not None) == retired
 

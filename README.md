@@ -111,7 +111,7 @@ Node.
 ```bash
 cp .env.example .env     # local settings: DEBUG on, defaults matching compose.yaml
 mise install             # Python and Node, at the versions in mise.toml
-mise run setup           # Python and frontend dependencies
+mise run setup           # Python and frontend dependencies, and the git hooks
 mise run migrate         # starts Postgres/PostGIS (:5432) and Redis (:6379), then migrates
 mise run dev             # Django on :8000
 ```
@@ -182,13 +182,43 @@ check is also its own task, and CI runs these same tasks, starting the database 
 `compose.yaml` as local development does:
 
 ```bash
-mise run lint              # Python lint (ruff)
+mise run hooks             # file hygiene and config files (the git hooks below)
+mise run lint              # Python lint and formatting (ruff)
 mise run typecheck         # Python types (pyright)
 mise run migrations-check  # migrations match models (starts the database)
 mise run test              # Python tests (starts the database)
-mise run frontend-check    # frontend lint, types and bundle
+mise run frontend-check    # frontend lint, formatting, types and bundle
 mise run frontend-test     # frontend tests (Vitest)
 ```
+
+`mise run format` applies ruff's safe lint fixes (removing an unused import, say), then formats
+Python (ruff) and the frontend (oxfmt), both at 100 columns. Every other task only checks.
+
+### Git hooks
+
+`mise run setup` installs [pre-commit](https://pre-commit.com/) hooks (`.pre-commit-config.yaml`)
+that run most of these checks before CI does:
+
+- On commit: `format` (which fixes what it safely can rather than failing), then `lint` and `typecheck`
+  for Python changes and `frontend-check` for frontend changes; plus file hygiene (merge conflict markers, final newlines, trailing whitespace,
+  line endings, large files, private keys) and config checks (YAML, TOML and JSON syntax; the CI
+  workflow, `compose.yaml`, `mise.toml` and `pyproject.toml` against their schemas). Committing
+  directly to `main` is refused.
+- On push: `migrations-check`, `test` and `frontend-test`, for whichever side changed. These
+  start the database, so Docker must be running.
+
+The tool hooks run the same mise tasks as CI, so they check exactly what CI checks. A hook that
+fixes files fails the commit; review and stage its changes, then commit again.
+`uv run pre-commit run -a` runs the commit hooks over every file. `git commit --no-verify` skips
+them, but CI still runs every check.
+
+Claude Code sessions also format each Python or frontend file right after editing it, with
+`mise run format-file <file>` (a hook in `.claude/settings.json`, the one shared file under
+`.claude/`; personal settings go in `.claude/settings.local.json`, which git ignores). Unlike
+`format`, it skips the lint fixes, which would remove an import added before the code that uses it.
+
+`git blame` skips commits that only reformat code, listed in `.git-blame-ignore-revs`. GitHub reads
+the file on its own; `mise run setup` also points your local git at it.
 
 ## Layout
 

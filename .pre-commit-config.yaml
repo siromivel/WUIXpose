@@ -1,0 +1,108 @@
+# Git hooks: `mise run setup` installs them. Run them all by hand with `uv run pre-commit run -a`.
+#
+# The tool hooks are local hooks that run the same mise tasks CI runs, each named after its task,
+# so a hook can't check anything different from CI, and they use the tools pinned in uv.lock and
+# package-lock.json rather than pre-commit's own copies. Only the file-hygiene and config checks
+# come from hook repos.
+#
+# CI runs the hygiene and config checks with `mise run hooks`, and the tasks behind the tool hooks
+# directly.
+
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        # Lockfiles are only ever written by uv and npm.
+        exclude: ^(uv\.lock|frontend/package-lock\.json)$
+      - id: trailing-whitespace
+        exclude: ^(uv\.lock|frontend/package-lock\.json)$
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        # tsconfig files are JSONC (they have comments), which tsc itself checks.
+        exclude: ^frontend/tsconfig.*\.json$
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.38.2
+    hooks:
+      - id: check-github-workflows
+      - id: check-compose-spec
+      - id: check-jsonschema
+        name: check mise.toml
+        files: ^mise\.toml$
+        types_or: [toml]  # the hook defaults to JSON and YAML only
+        args: [--schemafile, "https://mise.jdx.dev/schema/mise.json"]
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: '0.26'
+    hooks:
+      - id: validate-pyproject
+
+  # `unsupported` is pre-commit's name for "run this command as is" (formerly `system`). The tasks
+  # check the whole project, which pre-commit has stashed down to what's staged, since a change in
+  # one file can break another.
+  - repo: local
+    hooks:
+      # Applies safe lint fixes and formatting rather than failing on them, and runs first so the
+      # checks see the result.
+      - id: format
+        name: format (mise run format)
+        entry: mise run format
+        language: unsupported
+        files: (\.pyi?$|^frontend/)
+        pass_filenames: false
+      - id: lint
+        name: lint (mise run lint)
+        entry: mise run lint
+        language: unsupported
+        types_or: [python, pyi]
+        pass_filenames: false
+      - id: typecheck
+        name: typecheck (mise run typecheck)
+        entry: mise run typecheck
+        language: unsupported
+        types_or: [python, pyi]
+        pass_filenames: false
+      - id: frontend-check
+        name: frontend-check (mise run frontend-check)
+        entry: mise run frontend-check
+        language: unsupported
+        files: ^frontend/
+        pass_filenames: false
+
+      # Too slow for every commit, and they need the database, so they run on push. The mise tasks
+      # start it.
+      - id: migrations-check
+        name: migrations-check (mise run migrations-check)
+        entry: mise run migrations-check
+        language: unsupported
+        files: ^src/wuixpose/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
+      - id: test
+        name: test (mise run test)
+        entry: mise run test
+        language: unsupported
+        files: ^(src/|pyproject\.toml$|uv\.lock$)
+        pass_filenames: false
+        stages: [pre-push]
+      - id: frontend-test
+        name: frontend-test (mise run frontend-test)
+        entry: mise run frontend-test
+        language: unsupported
+        files: ^frontend/
+        pass_filenames: false
+        stages: [pre-push]

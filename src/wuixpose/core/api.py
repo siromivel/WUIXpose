@@ -94,7 +94,15 @@ class StructureSerializer(serializers.ModelSerializer):
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Structure
-        fields = ("id", "source", "source_id", "tract", "tract_county_apns", "tract_addresses", "footprint_sq_ft")
+        fields = (
+            "id",
+            "source",
+            "source_id",
+            "tract",
+            "tract_county_apns",
+            "tract_addresses",
+            "footprint_sq_ft",
+        )
 
     def get_tract_county_apns(self, structure: Structure) -> list[str]:
         return county_apns(structure.tract) if structure.tract else []

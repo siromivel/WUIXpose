@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 class Tract(models.Model):
     """Any defined area of land under management on which mitigation can be performed or delegated."""
+
     geom = models.MultiPolygonField(srid=STORAGE_SRID)
     # When this row's geometry last changed. Maintained by a database trigger (migration 0003),
     # so every writer gets it, including bulk updates and raw SQL; values written from Python

@@ -31,10 +31,22 @@ def loaded():
     boulder.load_structures([feature({"StructureID": "1N7116110001"}, box(0.0002, 0.0002, 0.0004, 0.0003))])
     boulder.load_addresses(
         [
-            point_feature(address_props("2", "10", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0002),
+            point_feature(
+                address_props("2", "10", "GOLD RUN", "146100000001", STREETTYPE="RD"),
+                0.0003,
+                0.0002,
+            ),
             point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STREETTYPE="RD"), 0.0003, 0.0003),
-            point_feature(address_props("4", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="10"), 0.0003, 0.0002),
-            point_feature(address_props("3", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="9"), 0.0003, 0.0002),
+            point_feature(
+                address_props("4", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="10"),
+                0.0003,
+                0.0002,
+            ),
+            point_feature(
+                address_props("3", "10", "GOLD RUN", "146100000001", STREETTYPE="RD", UNIT="9"),
+                0.0003,
+                0.0002,
+            ),
         ]
     )
     assignment.assign_structure_tracts()
@@ -247,7 +259,13 @@ def test_summary_reports_extent_of_tracts(client, loaded):
 @pytest.mark.django_db
 def test_retired_addresses_are_left_out(client, loaded):
     boulder.load_addresses(
-        [point_feature(address_props("1", "9", "GOLD RUN", "146100000001", STATUS="RETIRED"), 0.0003, 0.0003)]
+        [
+            point_feature(
+                address_props("1", "9", "GOLD RUN", "146100000001", STATUS="RETIRED"),
+                0.0003,
+                0.0003,
+            )
+        ]
     )
 
     tract = client.get(reverse("tract-detail", args=[loaded["tract"].pk])).json()

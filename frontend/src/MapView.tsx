@@ -128,7 +128,15 @@ function addDataLayers(map: MapLibreMap, tileSources: TileSources, zoneRings: Zo
     paint: {
       'line-color': ['case', selected, COLORS.tractSelected, COLORS.tract],
       // Zoom must be the outermost expression, so the selected case sits inside each stop.
-      'line-width': ['interpolate', ['linear'], ['zoom'], 12, ['case', selected, 2, 0.4], 17, ['case', selected, 3, 1.4]],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        12,
+        ['case', selected, 2, 0.4],
+        17,
+        ['case', selected, 3, 1.4],
+      ],
     },
   })
   // The shading says which zone the ground is in, so it is the same however many structures'
@@ -265,7 +273,10 @@ export function MapView({ initialBbox, tileSources, zoneRings, visible, focus, s
         onSelectRef.current(null)
         return
       }
-      onSelectRef.current({ kind: hit.layer.id === 'structures-fill' ? 'structure' : 'tract', id: hit.id })
+      onSelectRef.current({
+        kind: hit.layer.id === 'structures-fill' ? 'structure' : 'tract',
+        id: hit.id,
+      })
     })
     for (const id of ['structures-fill', 'tracts-fill']) {
       instance.on('mouseenter', id, () => (instance.getCanvas().style.cursor = 'pointer'))

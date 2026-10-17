@@ -27,6 +27,7 @@ dev = [
     "django-types>=0.24.0",
     "djangorestframework-types>=0.9.0",
     "mapbox-vector-tile>=2.2.0",
+    "pre-commit>=4.7.0",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-django>=4.14.0",
@@ -39,3 +40,5 @@ python_files = ["tests.py", "test_*.py"]
 
 [tool.ruff]
 extend-exclude = ["**/migrations/*"]
+# Matches the frontend's oxfmt printWidth.
+line-length = 120

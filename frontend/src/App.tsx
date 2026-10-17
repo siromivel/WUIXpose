@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 
-import { type SearchResult, type ServerConfig, type Summary, fetchServerConfig, fetchSummary, fetchTileJson } from './api'
+import {
+  type SearchResult,
+  type ServerConfig,
+  type Summary,
+  fetchServerConfig,
+  fetchSummary,
+  fetchTileJson,
+} from './api'
 import { type LayerVisibility, type Selection, TILE_LAYERS, type TileSources } from './layers'
 import { type Focus, MapView } from './MapView'
 import { Panel } from './Panel'
@@ -26,7 +33,12 @@ async function loadAppData(signal: AbortSignal): Promise<AppData> {
 export default function App() {
   const [appData, setAppData] = useState<AppData | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [visible, setVisible] = useState<LayerVisibility>({ tracts: true, structures: true, zones: true, imagery: false })
+  const [visible, setVisible] = useState<LayerVisibility>({
+    tracts: true,
+    structures: true,
+    zones: true,
+    imagery: false,
+  })
   const [selection, setSelection] = useState<Selection>(null)
   const [zoom, setZoom] = useState(0)
   const [focus, setFocus] = useState<Focus | null>(null)

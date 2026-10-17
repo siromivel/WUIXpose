@@ -171,7 +171,13 @@ def test_reloading_rewrites_stale_search_text():
 def test_search_api(client):
     boulder.load_tracts([feature({"PARCEL_NO": "A"}, box(0, 0, 0.001, 0.001))])
     boulder.load_addresses(
-        [point_feature(address_props("1", "1172", "VALLEY", "A", STREETTYPE="LN", ZIPCODE="80302"), 0.0005, 0.0005)]
+        [
+            point_feature(
+                address_props("1", "1172", "VALLEY", "A", STREETTYPE="LN", ZIPCODE="80302"),
+                0.0005,
+                0.0005,
+            )
+        ]
     )
     assignment.link_address_tracts()
     address = Address.objects.get()

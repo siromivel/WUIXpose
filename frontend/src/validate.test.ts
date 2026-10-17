@@ -105,7 +105,11 @@ describe('record', () => {
 })
 
 describe('object', () => {
-  const check = object({ id: number, name: nullable(string), tags: array(object({ label: string })) })
+  const check = object({
+    id: number,
+    name: nullable(string),
+    tags: array(object({ label: string })),
+  })
 
   it('returns only the keys in the shape', () => {
     expect(check({ id: 1, name: null, tags: [{ label: 'a', extra: true }], extra: 'dropped' }, '')).toEqual({

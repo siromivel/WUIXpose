@@ -33,14 +33,20 @@ describe('fetchServerConfig', () => {
   ]
 
   it('returns the checked config, without unknown fields', async () => {
-    respondWith({ search: { min_query_length: 3, max_results: 10 }, zones: { rings, rule_version: 1 } })
+    respondWith({
+      search: { min_query_length: 3, max_results: 10 },
+      zones: { rings, rule_version: 1 },
+    })
 
     expect(await fetchServerConfig()).toEqual({ search: { min_query_length: 3 }, zones: { rings } })
     expect(fetchMock).toHaveBeenCalledWith('/api/config/', { signal: undefined })
   })
 
   it('names the bad field inside a ring', async () => {
-    respondWith({ search: { min_query_length: 3 }, zones: { rings: [rings[0], { key: 'hiz_5_30', inner_ft: 5 }] } })
+    respondWith({
+      search: { min_query_length: 3 },
+      zones: { rings: [rings[0], { key: 'hiz_5_30', inner_ft: 5 }] },
+    })
 
     await expect(fetchServerConfig()).rejects.toThrow(
       'Unexpected response from /api/config/: zones.rings[1].outer_ft: expected a number, got undefined',
@@ -50,9 +56,20 @@ describe('fetchServerConfig', () => {
 
 describe('fetchSummary', () => {
   it('returns the checked summary, without unknown fields', async () => {
-    respondWith({ tract_count: 3, structure_count: 4, address_count: 5, bbox: [1, 2, 3, 4], extra: true })
+    respondWith({
+      tract_count: 3,
+      structure_count: 4,
+      address_count: 5,
+      bbox: [1, 2, 3, 4],
+      extra: true,
+    })
 
-    expect(await fetchSummary()).toEqual({ tract_count: 3, structure_count: 4, address_count: 5, bbox: [1, 2, 3, 4] })
+    expect(await fetchSummary()).toEqual({
+      tract_count: 3,
+      structure_count: 4,
+      address_count: 5,
+      bbox: [1, 2, 3, 4],
+    })
   })
 
   it('accepts a null bbox for an empty database', async () => {
@@ -114,7 +131,9 @@ describe('searchAddresses', () => {
     respondWith({ results: [{ ...address, tract: null }] })
 
     expect(await searchAddresses('1172 valley & co')).toEqual([{ ...address, tract: null }])
-    expect(fetchMock).toHaveBeenCalledWith('/api/search/?q=1172+valley+%26+co', { signal: undefined })
+    expect(fetchMock).toHaveBeenCalledWith('/api/search/?q=1172+valley+%26+co', {
+      signal: undefined,
+    })
   })
 
   it('requires the tract key on each result', async () => {

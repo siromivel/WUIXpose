@@ -7,3 +7,6 @@
 
 # Widen the frontend's printWidth to 120
 741c7fd71d70c762e668d37579d682f01ee9828b
+
+# Widen ruff's line length to 120 to match the frontend
+3eeacdc5e1fc09814fe8b8bc6c02e5b40f1a5786

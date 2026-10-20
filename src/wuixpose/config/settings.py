@@ -56,10 +56,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "allauth",
     "allauth.account",
-    # Installed before any provider is configured, so connecting one later is a settings change
-    # rather than a migration.
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.openid_connect",
     "allauth.headless",
     "wuixpose.accounts.apps.AccountsConfig",
     "wuixpose.core.apps.CoreConfig",
@@ -163,36 +159,16 @@ AUTH_PASSWORD_VALIDATORS = [
 # on the same session cookie as the rest of the site; the browser never holds a token.
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
-# Every email verified (and unique, allauth's default): a trusted OIDC provider is later allowed
-# to sign in to the local account with the same email.
+# Every email verified (and unique, allauth's default), so an account's email is known to be its owner's.
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 # Codes typed into the map UI rather than links, so the UI needs no routes of its own.
 ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
 ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = True
 HEADLESS_ONLY = True
 HEADLESS_CLIENTS = ("browser",)
-# Where a provider sign-in that went wrong, or that needs more from the user, lands.
-HEADLESS_FRONTEND_URLS = {"socialaccount_login_error": "/", "account_signup": "/"}
-
-# An OIDC provider (e.g. Keycloak) that people can sign in with, when its server URL is set.
-# Accounts are linked by the provider's subject; a first sign-in whose email the provider has
-# verified signs in to, and links, the local account with that email.
-WUIXPOSE_OIDC_SERVER_URL = env.str("WUIXPOSE_OIDC_SERVER_URL", default="")
-SOCIALACCOUNT_PROVIDERS = {}
-if WUIXPOSE_OIDC_SERVER_URL:
-    SOCIALACCOUNT_PROVIDERS["openid_connect"] = {
-        "OAUTH_PKCE_ENABLED": True,
-        "APPS": [
-            {
-                "provider_id": env.str("WUIXPOSE_OIDC_PROVIDER_ID", default="keycloak"),
-                "name": env.str("WUIXPOSE_OIDC_PROVIDER_NAME", default="Keycloak"),
-                "client_id": env.str("WUIXPOSE_OIDC_CLIENT_ID"),
-                "secret": env.str("WUIXPOSE_OIDC_CLIENT_SECRET"),
-                "settings": {"server_url": WUIXPOSE_OIDC_SERVER_URL, "email_authentication": True},
-            }
-        ],
-    }
-SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+# The links in the emails allauth sends when someone signs up with an email that already has an
+# account, or asks to reset one that has none. Headless, it has no pages of its own to link to.
+HEADLESS_FRONTEND_URLS = {"account_signup": "/", "account_reset_password": "/"}
 
 # Console in development; in production, an SMTP URL (django-environ's EMAIL_URL format).
 # django-environ leaves email_url()'s default unannotated too.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { AuthError, csrfToken, fetchProviders, fetchSession, signIn, signOut, signUp, verifyEmail } from './auth'
+import { AuthError, csrfToken, fetchSession, signIn, signOut, signUp, verifyEmail } from './auth'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -140,19 +140,5 @@ describe('signOut', () => {
       '/api/auth/browser/v1/auth/session',
       expect.objectContaining({ method: 'DELETE' }),
     )
-  })
-})
-
-describe('fetchProviders', () => {
-  it('returns the providers the server offers', async () => {
-    respondWith(200, {
-      status: 200,
-      data: {
-        account: { login_methods: ['email'] },
-        socialaccount: { providers: [{ id: 'keycloak', name: 'Keycloak', flows: ['provider_redirect'] }] },
-      },
-    })
-
-    expect(await fetchProviders()).toEqual([{ id: 'keycloak', name: 'Keycloak' }])
   })
 })

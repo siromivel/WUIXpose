@@ -113,30 +113,9 @@ signed in or not; endpoints that need a user say so with DRF's `IsAuthenticated`
   `manage.py createsuperuser` makes one. Admin's login form isn't rate limited, so a public
   deployment should keep `/admin/` off the open internet.
 
-### Signing in with an OIDC provider
-
-Accounts are ready to also sign in through an OpenID Connect provider such as a Keycloak realm.
-Setting `WUIXPOSE_OIDC_SERVER_URL`, `WUIXPOSE_OIDC_CLIENT_ID` and `WUIXPOSE_OIDC_CLIENT_SECRET`
-turns it on with no migration: allauth's `socialaccount` tables already exist, and the map UI
-offers each provider listed in `/api/auth/browser/v1/config`. Django is the OIDC client
-(confidential, with PKCE) and its callback is `/api/auth/oidc/<provider id>/login/callback/`.
-
-A provider identity is stored as a `SocialAccount` (provider and subject) linked to the user, so
-connecting one adds rows rather than changing users. The configured provider is trusted to vouch
-for email addresses: its first sign-in for an email it has verified signs in to the local account
-with that email and links them. Only enable that for a provider we run.
-
-Before turning it on for real users:
-
-- Delete local accounts whose email was never verified, or keep them from being linked. allauth
-  links to a matching local account even if that account's own email is unverified, so whoever
-  created an unverified account for someone else's email would then share it.
-- Decide what happens to local passwords. Both ways of signing in can stay, or
-  `SOCIALACCOUNT_ONLY` turns local passwords off once everyone has linked. Keycloak can also
-  verify Argon2 hashes, so moving them into the realm is possible, but its import format needs
-  trying first.
-- Two-factor authentication isn't offered yet. With Keycloak, it would live there; TOTP secrets
-  and passkeys enrolled here couldn't move.
+Signing in through an OpenID Connect provider (e.g. Keycloak) could be added later without
+changing users: allauth would link that identity to the existing `accounts.User` as a
+`SocialAccount`, and nothing here depends on how someone signed in.
 
 ## Stack
 
@@ -200,7 +179,7 @@ the verification code is printed in the Django console (`mise run dev`) rather t
 | `/api/tracts/<id>/` | Addresses, county parcel numbers, acreage, structure ids |
 | `/api/structures/<id>/` | Source ID, tract and its addresses and county parcel numbers, footprint square feet |
 | `/api/search/?q=` | Up to 10 current addresses best matching `q`, best first, each with its point and tract (see [Address search](#address-search)) |
-| `/api/auth/browser/v1/...` | Sign-up, sign-in, the current session and sign-in options ([allauth headless API](https://docs.allauth.org/en/latest/headless/openapi-specification/); see [Accounts](#accounts)) |
+| `/api/auth/browser/v1/...` | Sign-up, sign-in and the current session ([allauth headless API](https://docs.allauth.org/en/latest/headless/openapi-specification/); see [Accounts](#accounts)) |
 
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
 frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`. Likewise, they
@@ -223,8 +202,6 @@ aren't set. `.env.example` lists them all.
 - `WUIXPOSE_INGEST_USER_AGENT` identifies ingest requests to county GIS servers.
 - `DJANGO_EMAIL_URL` sets where account emails go: the console when `DJANGO_DEBUG` is on, SMTP on
   localhost:25 otherwise. `DJANGO_DEFAULT_FROM_EMAIL` is their sender.
-- `WUIXPOSE_OIDC_*` connect an OIDC provider (see
-  [Signing in with an OIDC provider](#signing-in-with-an-oidc-provider)).
 - Session and CSRF cookies are sent only over HTTPS when `DJANGO_DEBUG` is off.
 
 The frontend reads `VITE_*` variables at build time for the basemap style, imagery tiles and

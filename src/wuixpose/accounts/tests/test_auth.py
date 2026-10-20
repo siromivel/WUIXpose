@@ -3,6 +3,7 @@ import re
 import pytest
 from allauth.account.models import EmailAddress
 from django.core import mail
+from django.core.cache import cache
 
 from wuixpose.accounts.models import User
 
@@ -15,6 +16,8 @@ PASSWORD = "correct horse battery"
 def isolated_cache(settings):
     """Rate limit counts live in the cache; keep them out of the shared Redis and between tests."""
     settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    # Every LocMemCache with the same location shares one store for the whole process.
+    cache.clear()
 
 
 def verified_user(email: str = EMAIL, password: str = PASSWORD) -> User:
@@ -88,29 +91,18 @@ def test_repeated_wrong_passwords_are_rate_limited(client):
 
 
 @pytest.mark.django_db
-def test_no_sign_in_providers_unless_one_is_configured(client):
-    assert client.get(f"{API}/config").json()["data"]["socialaccount"]["providers"] == []
+def test_signing_up_with_a_taken_email_emails_its_owner(client):
+    verified_user()
 
+    response = client.post(
+        f"{API}/auth/signup", {"email": EMAIL, "password": PASSWORD}, content_type="application/json"
+    )
 
-@pytest.mark.django_db
-def test_a_configured_oidc_provider_is_offered(client, settings):
-    settings.SOCIALACCOUNT_PROVIDERS = {
-        "openid_connect": {
-            "APPS": [
-                {
-                    "provider_id": "keycloak",
-                    "name": "Keycloak",
-                    "client_id": "wuixpose",
-                    "secret": "secret",
-                    "settings": {"server_url": "https://auth.example/realms/wuixpose", "email_authentication": True},
-                }
-            ]
-        }
-    }
-
-    providers = client.get(f"{API}/config").json()["data"]["socialaccount"]["providers"]
-
-    assert [(p["id"], p["name"]) for p in providers] == [("keycloak", "Keycloak")]
+    # Answered like a new signup, so it doesn't reveal which emails have accounts.
+    assert response.status_code == 401
+    assert User.objects.count() == 1
+    assert mail.outbox[-1].to == [EMAIL]
+    assert "http://testserver/" in mail.outbox[-1].body
 
 
 @pytest.mark.django_db

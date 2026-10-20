@@ -21,11 +21,6 @@ const signedOut = object({
 })
 const failed = object({ errors: array(object({ message: string })) })
 
-// The ways to sign in that the server offers besides a password, e.g. a Keycloak realm.
-const provider = object({ id: string, name: string })
-export type Provider = Checked<typeof provider>
-const authConfig = object({ data: object({ socialaccount: object({ providers: array(provider) }) }) })
-
 // A request the server turned down for a reason the person can fix, e.g. a wrong password.
 export class AuthError extends Error {
   name = 'AuthError'
@@ -78,29 +73,3 @@ export const signUp = (email: string, password: string) => request('POST', '/aut
 export const verifyEmail = (code: string) => request('POST', '/auth/email/verify', { key: code })
 
 export const signOut = () => request('DELETE', '/auth/session')
-
-export async function fetchProviders(signal?: AbortSignal): Promise<Provider[]> {
-  const url = `${BASE}/config`
-  const response = await fetch(url, { signal })
-  if (!response.ok) throw new Error(`${url}: ${response.status} ${response.statusText}`)
-  return checked(url, authConfig, await response.json()).data.socialaccount.providers
-}
-
-// Signing in with a provider leaves the app: the browser posts a form to Django, which sends it on
-// to the provider and, once signed in there, back to `returnTo` with the session set. Django keeps
-// the provider's tokens; the app only ever sees the session.
-export function redirectToProvider(providerId: string, returnTo: string = window.location.pathname) {
-  const form = document.createElement('form')
-  form.method = 'POST'
-  form.action = `${BASE}/auth/provider/redirect`
-  const fields = { provider: providerId, process: 'login', callback_url: returnTo, csrfmiddlewaretoken: csrfToken() }
-  for (const [name, value] of Object.entries(fields)) {
-    const input = document.createElement('input')
-    input.type = 'hidden'
-    input.name = name
-    input.value = value
-    form.append(input)
-  }
-  document.body.append(form)
-  form.submit()
-}

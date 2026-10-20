@@ -119,8 +119,8 @@ If a tool isn't on PATH, use `mise exec -- <command>`.
 - django-allauth (headless) does sign-up, sign-in and verification; don't write auth views or
   token handling. The browser authenticates with the session cookie only, never a token.
 - Point at users with a foreign key to `settings.AUTH_USER_MODEL` (`accounts.User`), never by
-  email or username. An OIDC identity is an allauth `SocialAccount` linked to the user, so the
-  app must work the same whichever way someone signed in.
+  email or username, and never depend on how someone signed in, so an OIDC provider can be linked
+  later (README, "Accounts").
 - Public endpoints stay `AllowAny` (DRF's default); ones that need a user use `IsAuthenticated`.
 - Authorization (who may see or change what) belongs to our own models and groups, checked in
   service functions, not in claims from an identity provider.

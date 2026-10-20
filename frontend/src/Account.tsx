@@ -1,42 +1,16 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
-import {
-  AuthError,
-  type AuthState,
-  type Provider,
-  fetchProviders,
-  fetchSession,
-  redirectToProvider,
-  signIn,
-  signOut,
-  signUp,
-  verifyEmail,
-} from './auth'
-
-// A provider sign-in that failed comes back to the app with an `error` query parameter.
-function takeProviderError(): string | null {
-  const params = new URLSearchParams(window.location.search)
-  const error = params.get('error')
-  if (error === null) return null
-  params.delete('error')
-  const query = params.toString()
-  window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
-  return `Signing in with the provider didn't work (${error}).`
-}
+import { AuthError, type AuthState, fetchSession, signIn, signOut, signUp, verifyEmail } from './auth'
 
 export function Account() {
   const [state, setState] = useState<AuthState | null>(null)
-  const [providers, setProviders] = useState<Provider[]>([])
-  const [error, setError] = useState<string | null>(takeProviderError)
+  const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([fetchSession(controller.signal), fetchProviders(controller.signal)])
-      .then(([session, offered]) => {
-        setState(session)
-        setProviders(offered)
-      })
+    fetchSession(controller.signal)
+      .then(setState)
       .catch((err: unknown) => {
         if (!controller.signal.aborted) setError(String(err))
       })
@@ -71,7 +45,6 @@ export function Account() {
       ) : (
         <SignInForm
           busy={busy}
-          providers={providers}
           onSignIn={(email, password) => act(() => signIn(email, password))}
           onSignUp={(email, password) => act(() => signUp(email, password))}
         />
@@ -83,12 +56,11 @@ export function Account() {
 
 interface SignInProps {
   busy: boolean
-  providers: Provider[]
   onSignIn: (email: string, password: string) => void
   onSignUp: (email: string, password: string) => void
 }
 
-function SignInForm({ busy, providers, onSignIn, onSignUp }: SignInProps) {
+function SignInForm({ busy, onSignIn, onSignUp }: SignInProps) {
   const [creating, setCreating] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -127,11 +99,6 @@ function SignInForm({ busy, providers, onSignIn, onSignUp }: SignInProps) {
           {creating ? 'Sign in' : 'Create an account'}
         </button>
       </p>
-      {providers.map((provider) => (
-        <button key={provider.id} type="button" disabled={busy} onClick={() => redirectToProvider(provider.id)}>
-          Sign in with {provider.name}
-        </button>
-      ))}
     </form>
   )
 }

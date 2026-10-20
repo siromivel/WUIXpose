@@ -186,6 +186,9 @@ right) centers the map on you and follows as you move; panning away stops follow
 allow location only on `localhost` or HTTPS, so it won't work from a phone on the LAN over plain
 `http://<ip>:5173`.
 
+The Account section of the panel signs in or creates an account. In development, the email with
+the verification code is printed in the Django console (`mise run dev`) rather than sent.
+
 ## API
 
 | Path | Returns |

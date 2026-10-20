@@ -164,7 +164,8 @@ code {
   font-size: 12px;
 }
 
-.search input {
+.search input,
+.account input {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--line);
@@ -174,9 +175,52 @@ code {
   font: inherit;
 }
 
-.search input:focus {
+.search input:focus,
+.account input:focus {
   outline: 2px solid var(--link);
   outline-offset: -1px;
+}
+
+.account form {
+  display: grid;
+  gap: 8px;
+}
+
+.account form > button {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.account form > button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.account button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.account .signed-in {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.account .switch {
+  font-size: 13px;
+}
+
+.account > .error {
+  margin-top: 8px;
 }
 
 .search > p {

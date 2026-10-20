@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { Account } from './Account'
 import { AddressSearch } from './AddressSearch'
 import {
   type Address,
@@ -53,6 +54,11 @@ export function Panel({
         <h1>WUIXpose</h1>
         <p className="subtitle">Wildfire mitigation assessment for homes in the wildland-urban interface</p>
       </header>
+
+      <section>
+        <h2>Account</h2>
+        <Account />
+      </section>
 
       <section>
         <AddressSearch minQueryLength={serverConfig?.search.min_query_length ?? null} onPick={onPickAddress} />

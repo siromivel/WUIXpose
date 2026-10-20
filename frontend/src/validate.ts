@@ -23,6 +23,9 @@ export const number: Check<number> = (value, path) =>
 export const string: Check<string> = (value, path) =>
   typeof value === 'string' ? value : fail(path, 'a string', value)
 
+export const boolean: Check<boolean> = (value, path) =>
+  typeof value === 'boolean' ? value : fail(path, 'a boolean', value)
+
 export const nullable =
   <T>(check: Check<T>): Check<T | null> =>
   (value, path) =>

@@ -1,6 +1,17 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import { type Checked, InvalidData, array, nullable, number, object, optional, record, string } from './validate'
+import {
+  type Checked,
+  InvalidData,
+  array,
+  boolean,
+  nullable,
+  number,
+  object,
+  optional,
+  record,
+  string,
+} from './validate'
 
 describe('number', () => {
   it('accepts finite numbers', () => {
@@ -25,6 +36,18 @@ describe('string', () => {
 
   it('rejects other types', () => {
     expect(() => string(1, 's')).toThrow('s: expected a string, got number')
+  })
+})
+
+describe('boolean', () => {
+  it('accepts true and false', () => {
+    expect(boolean(true, 'b')).toBe(true)
+    expect(boolean(false, 'b')).toBe(false)
+  })
+
+  it('rejects truthy and falsy stand-ins', () => {
+    expect(() => boolean(1, 'b')).toThrow('b: expected a boolean, got number')
+    expect(() => boolean('false', 'b')).toThrow('b: expected a boolean, got string')
   })
 })
 

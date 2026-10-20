@@ -54,6 +54,14 @@ INSTALLED_APPS = [
     "django.contrib.gis",
     "django.contrib.postgres",  # trigram lookups for address search
     "rest_framework",
+    "allauth",
+    "allauth.account",
+    # Installed before any provider is configured, so connecting one later is a settings change
+    # rather than a migration.
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.openid_connect",
+    "allauth.headless",
+    "wuixpose.accounts.apps.AccountsConfig",
     "wuixpose.core.apps.CoreConfig",
 ]
 
@@ -65,6 +73,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "wuixpose.config.urls"
@@ -117,15 +126,30 @@ CACHES = {
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+# Authentication
 
+AUTH_USER_MODEL = "accounts.User"
+
+# allauth's backend alone, so a password is checked against an account's email whatever form sent
+# it. Admin's login form uses it too, but outside allauth's rate limits.
+AUTHENTICATION_BACKENDS = ["allauth.account.auth_backends.AuthenticationBackend"]
+
+# Argon2id first; the others only verify older hashes, which are upgraded at the next login.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+]
+
+# NIST SP 800-63B rev. 4: at least 15 characters for a password that is the only factor, and no
+# composition rules.
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 15},
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -134,6 +158,61 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+# Accounts (django-allauth). The map UI signs in through allauth's headless JSON API, which runs
+# on the same session cookie as the rest of the site; the browser never holds a token.
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
+# Every email verified (and unique, allauth's default): a trusted OIDC provider is later allowed
+# to sign in to the local account with the same email.
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+# Codes typed into the map UI rather than links, so the UI needs no routes of its own.
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
+ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = True
+HEADLESS_ONLY = True
+HEADLESS_CLIENTS = ("browser",)
+# Where a provider sign-in that went wrong, or that needs more from the user, lands.
+HEADLESS_FRONTEND_URLS = {"socialaccount_login_error": "/", "account_signup": "/"}
+
+# An OIDC provider (e.g. Keycloak) that people can sign in with, when its server URL is set.
+# Accounts are linked by the provider's subject; a first sign-in whose email the provider has
+# verified signs in to, and links, the local account with that email.
+WUIXPOSE_OIDC_SERVER_URL = env.str("WUIXPOSE_OIDC_SERVER_URL", default="")
+SOCIALACCOUNT_PROVIDERS = {}
+if WUIXPOSE_OIDC_SERVER_URL:
+    SOCIALACCOUNT_PROVIDERS["openid_connect"] = {
+        "OAUTH_PKCE_ENABLED": True,
+        "APPS": [
+            {
+                "provider_id": env.str("WUIXPOSE_OIDC_PROVIDER_ID", default="keycloak"),
+                "name": env.str("WUIXPOSE_OIDC_PROVIDER_NAME", default="Keycloak"),
+                "client_id": env.str("WUIXPOSE_OIDC_CLIENT_ID"),
+                "secret": env.str("WUIXPOSE_OIDC_CLIENT_SECRET"),
+                "settings": {"server_url": WUIXPOSE_OIDC_SERVER_URL, "email_authentication": True},
+            }
+        ],
+    }
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+
+# Console in development; in production, an SMTP URL (django-environ's EMAIL_URL format).
+# django-environ leaves email_url()'s default unannotated too.
+vars().update(
+    env.email_url(
+        "DJANGO_EMAIL_URL",
+        default="consolemail://" if DEBUG else "smtp://localhost:25",  # pyright: ignore[reportArgumentType]
+    )
+)
+DEFAULT_FROM_EMAIL = env.str("DJANGO_DEFAULT_FROM_EMAIL", default="WUIXpose <noreply@localhost>")
+
+# Sign-in cookies only over HTTPS outside development.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+REST_FRAMEWORK = {
+    # The session only. DRF's default also accepts HTTP Basic, which would check passwords outside
+    # allauth's rate limits.
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+}
 
 
 # Internationalization

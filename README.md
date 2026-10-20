@@ -94,6 +94,50 @@ instead of one or two.
 The county has a few addresses that are exact duplicates (separate address points with the same
 number, street, unit and parcel). Search returns each of them.
 
+## Accounts
+
+People sign in with an email and password, through
+[django-allauth](https://docs.allauth.org/)'s headless JSON API under `/api/auth/` (the map UI
+uses its `browser` client). Signing in sets Django's usual session cookie, which every other
+endpoint reads; the browser never holds a token. The map, tiles and search stay open to anyone
+signed in or not; endpoints that need a user say so with DRF's `IsAuthenticated`.
+
+- Signup sends a code by email, and the account can't sign in until the code is entered. Password
+  resets work the same way. Each email belongs to one account.
+- Passwords need at least 15 characters (NIST SP 800-63B rev. 4) and no particular mix of
+  characters, and are stored as Argon2id hashes. Failed sign-ins are rate limited (5 per account
+  per 5 minutes, 10 per IP per minute) through the Redis cache.
+- The user model is `accounts.User`. Other tables refer to a user by its primary key, never by
+  email or username, which can change.
+- Django admin signs in with the same email and password; give a user `is_staff` to let them in.
+  `manage.py createsuperuser` makes one. Admin's login form isn't rate limited, so a public
+  deployment should keep `/admin/` off the open internet.
+
+### Signing in with an OIDC provider
+
+Accounts are ready to also sign in through an OpenID Connect provider such as a Keycloak realm.
+Setting `WUIXPOSE_OIDC_SERVER_URL`, `WUIXPOSE_OIDC_CLIENT_ID` and `WUIXPOSE_OIDC_CLIENT_SECRET`
+turns it on with no migration: allauth's `socialaccount` tables already exist, and the map UI
+offers each provider listed in `/api/auth/browser/v1/config`. Django is the OIDC client
+(confidential, with PKCE) and its callback is `/api/auth/oidc/<provider id>/login/callback/`.
+
+A provider identity is stored as a `SocialAccount` (provider and subject) linked to the user, so
+connecting one adds rows rather than changing users. The configured provider is trusted to vouch
+for email addresses: its first sign-in for an email it has verified signs in to the local account
+with that email and links them. Only enable that for a provider we run.
+
+Before turning it on for real users:
+
+- Delete local accounts whose email was never verified, or keep them from being linked. allauth
+  links to a matching local account even if that account's own email is unverified, so whoever
+  created an unverified account for someone else's email would then share it.
+- Decide what happens to local passwords. Both ways of signing in can stay, or
+  `SOCIALACCOUNT_ONLY` turns local passwords off once everyone has linked. Keycloak can also
+  verify Argon2 hashes, so moving them into the realm is possible, but its import format needs
+  trying first.
+- Two-factor authentication isn't offered yet. With Keycloak, it would live there; TOTP secrets
+  and passkeys enrolled here couldn't move.
+
 ## Stack
 
 Python, Django 5.2 with GeoDjango, Django REST Framework, PostgreSQL 17 + PostGIS and Redis,
@@ -153,6 +197,7 @@ allow location only on `localhost` or HTTPS, so it won't work from a phone on th
 | `/api/tracts/<id>/` | Addresses, county parcel numbers, acreage, structure ids |
 | `/api/structures/<id>/` | Source ID, tract and its addresses and county parcel numbers, footprint square feet |
 | `/api/search/?q=` | Up to 10 current addresses best matching `q`, best first, each with its point and tract (see [Address search](#address-search)) |
+| `/api/auth/browser/v1/...` | Sign-up, sign-in, the current session and sign-in options ([allauth headless API](https://docs.allauth.org/en/latest/headless/openapi-specification/); see [Accounts](#accounts)) |
 
 Map clients should read a layer's TileJSON rather than hardcode its URL or zoom range; the
 frontend does. Layers are defined in one place, `LAYERS` in `core/tiles.py`. Likewise, they
@@ -173,6 +218,11 @@ aren't set. `.env.example` lists them all.
 - `POSTGRES_*` and `REDIS_URL` default to the `compose.yaml` services.
 - `WUIXPOSE_TILE_CACHE_SECONDS` sets `Cache-Control` on tiles and TileJSON (default 300).
 - `WUIXPOSE_INGEST_USER_AGENT` identifies ingest requests to county GIS servers.
+- `DJANGO_EMAIL_URL` sets where account emails go: the console when `DJANGO_DEBUG` is on, SMTP on
+  localhost:25 otherwise. `DJANGO_DEFAULT_FROM_EMAIL` is their sender.
+- `WUIXPOSE_OIDC_*` connect an OIDC provider (see
+  [Signing in with an OIDC provider](#signing-in-with-an-oidc-provider)).
+- Session and CSRF cookies are sent only over HTTPS when `DJANGO_DEBUG` is off.
 
 The frontend reads `VITE_*` variables at build time for the basemap style, imagery tiles and
 default map center; `frontend/.env.example` lists them, and `frontend/src/config.ts` holds the
@@ -228,6 +278,7 @@ the file on its own; `mise run setup` also points your local git at it.
 ```
 src/wuixpose/
   config/   settings, URLs, ASGI/WSGI
+  accounts/ the user model (its own app: Django needs it in the app's first migration)
   core/     models (tracts, structures, addresses, zones), migrations
     constants.py  SRIDs, unit conversions and other values shared across modules
     ingest/   ArcGIS REST client, geometry cleanup, Boulder County loaders
